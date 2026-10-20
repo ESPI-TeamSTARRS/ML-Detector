@@ -1,0 +1,9 @@
+# --- Environnement de développement (venv local uniquement, pas dans Docker) ---
+-r requirements.txt
+
+# Exploration des données et graphiques
+matplotlib==3.10.1
+jupyterlab==4.3.6
+
+# Tests (l'archive Code.zip doit contenir des tests)
+pytest==8.3.5

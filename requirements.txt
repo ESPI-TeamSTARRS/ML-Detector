@@ -1,0 +1,24 @@
+# --- Runtime du détecteur ML (utilisé aussi dans le Dockerfile du service) ---
+# Versions figées : le modèle entraîné dans le venv doit être rechargé
+# avec EXACTEMENT les mêmes versions dans le conteneur.
+
+# Calcul et données
+numpy==2.2.6
+pandas==2.2.3
+
+# Machine learning (Isolation Forest) + sauvegarde du modèle
+scikit-learn==1.6.1
+joblib==1.4.2
+
+# Interrogation de l'API Prometheus + envoi des alertes à la remédiation
+requests==2.32.3
+
+# Service temps réel du détecteur
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+# Exposition de la métrique anomaly_score pour Prometheus/Grafana
+prometheus-client==0.21.1
+
+# Configuration via variables d'environnement (jamais de secret dans le code)
+python-dotenv==1.1.0

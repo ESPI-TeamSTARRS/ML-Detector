@@ -1,0 +1,29 @@
+# --- Environnement Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# --- Secrets : JAMAIS dans le dépôt (lus via <NOM>_FILE ou variable d'environnement) ---
+.env
+.env.*
+secrets/
+*.pem
+*.key
+
+# --- Données (les dossiers sont gardés grâce à .gitkeep) ---
+data/*
+!data/.gitkeep
+
+# --- Éditeurs et système ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Divers ---
+*.log
+*.ipynb

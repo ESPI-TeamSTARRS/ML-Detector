@@ -1,0 +1,5 @@
+# À ajouter dans scrape_configs de prometheus.yml
+  - job_name: ml-detector
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["ml-detector:8000"]

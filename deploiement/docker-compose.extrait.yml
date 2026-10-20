@@ -1,0 +1,29 @@
+# Extrait à intégrer dans le docker-compose.yml de l'équipe (à adapter avec INFRA).
+# Un seul mode de transmission est actif à la fois : DETECTOR_SOURCE = loki OU push.
+services:
+  ml-detector:
+    build: ./ML-Detector
+    environment:
+      DETECTOR_SOURCE: loki                     # loki | push (simule = développement uniquement)
+      LOKI_URL: http://loki:3100
+      LOKI_LABEL_SERVICE: service               # nom du label Loki qui porte le nom du service
+      REMEDIATION_URL: http://remediation:8080/alertes   # à confirmer avec la remédiation
+      ALERT_TOKEN_FILE: /run/secrets/alert_token          # jamais le jeton en clair ici
+      # Mode push uniquement :
+      # INGEST_TOKEN_FILE: /run/secrets/ingest_token
+    secrets:
+      - alert_token
+      # - ingest_token                          # mode push uniquement
+    read_only: true            # système de fichiers en lecture seule
+    cap_drop: [ALL]            # aucun privilège noyau
+    security_opt: ["no-new-privileges:true"]
+    # PAS de "ports:" : joignable uniquement par Prometheus et le dashboard sur le réseau interne
+    # PAS de montage de /var/run/docker.sock : ce serait donner root sur l'hôte au détecteur.
+    networks: [supervision]
+    restart: unless-stopped
+
+secrets:
+  alert_token:
+    file: ./secrets/alert_token   # fichier déchiffré par SOPS ou fourni par Vault, ignoré par git
+  # ingest_token:
+  #   file: ./secrets/ingest_token
