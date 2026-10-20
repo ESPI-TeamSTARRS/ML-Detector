@@ -15,6 +15,7 @@ from fastapi import FastAPI
 import config
 from app.domaine.detecteur import AnomalyDetector
 from app.application.alerter import NotificateurRemediation
+from app.application.contexte_llm import NotificateurRAG
 from app.application.detecter import Moteur
 from app.infrastructure.sources.simulation import SimulationSource
 from app.infrastructure.sources.loki import LokiSource
@@ -58,6 +59,10 @@ def construire_moteur() -> Moteur:
         detecteur=charger_detecteur(simule),
         source=source,
         notificateur=NotificateurRemediation(config.REMEDIATION_URL, config.lire_secret("ALERT_TOKEN")),
+        notificateur_rag=(NotificateurRAG(config.RAG_URL, config.lire_secret("RAG_TOKEN"), config.RAG_TIMEOUT_S)
+                          if config.RAG_URL else None),
+        rag_fenetre_s=config.RAG_FENETRE_S,
+        rag_max_logs=config.RAG_MAX_LOGS,
         pas=config.STEP_SECONDS,
         retard=retard,
         n_consecutifs=config.N_CONSECUTIFS,

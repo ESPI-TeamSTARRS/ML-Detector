@@ -10,6 +10,14 @@ on change le comportement dans le docker-compose, pas dans le code.
 """
 import os
 
+# Développement : si un fichier .env existe, ses valeurs sont chargées. Les VRAIES variables
+# d'environnement (celles que Docker injecte en production) restent prioritaires (override=False).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=False)
+except ImportError:  # python-dotenv absent : on lit simplement l'environnement
+    pass
+
 # --- Rythme -----------------------------------------------------------------
 # Une "photo" du système = une fenêtre de STEP_SECONDS secondes (décision D4).
 STEP_SECONDS = 10
@@ -29,6 +37,9 @@ LAG_SECONDS = int(os.getenv("LAG_SECONDS", "5"))
 LOKI_URL = os.getenv("LOKI_URL", "http://localhost:3100")
 # Nom du label Loki qui porte le nom du service (dépend de la config Promtail/Alloy d'INFRA).
 LOKI_LABEL_SERVICE = os.getenv("LOKI_LABEL_SERVICE", "service")
+# Motifs à écarter (bruit), séparés par des virgules. Ex. "bwapi" : les vérifications de santé
+# de BunkerWeb toutes les 30 s, qui ne reflètent pas le trafic réel.
+LOKI_EXCLURE = [m.strip() for m in os.getenv("LOKI_EXCLURE", "").split(",") if m.strip()]
 # Sélecteur LogQL des flux à lire. Par défaut : tous ceux qui ont le label service.
 # Exemple si INFRA ajoute un label de projet : '{compose_project="resilience",service=~".+"}'
 LOKI_SELECTEUR = os.getenv("LOKI_SELECTEUR", "") or '{%s=~".+"}' % LOKI_LABEL_SERVICE
@@ -63,6 +74,13 @@ MODEL_PATH = os.getenv("MODEL_PATH", "models/detecteur.joblib")
 N_CONSECUTIFS = int(os.getenv("N_CONSECUTIFS", "3"))
 # URL du moteur de remédiation. Vide = les alertes sont seulement journalisées.
 REMEDIATION_URL = os.getenv("REMEDIATION_URL", "")
+
+# --- Contexte envoyé au LLM / RAG (début d'incident uniquement) -------------------
+# URL du RAG. Vide = fonction désactivée. Jeton : RAG_TOKEN (ou RAG_TOKEN_FILE).
+RAG_URL = os.getenv("RAG_URL", "")
+RAG_FENETRE_S = int(os.getenv("RAG_FENETRE_S", "60"))   # logs des N dernières secondes
+RAG_MAX_LOGS = int(os.getenv("RAG_MAX_LOGS", "200"))    # plafond de logs par envoi
+RAG_TIMEOUT_S = float(os.getenv("RAG_TIMEOUT_S", "3"))  # délai max : le LLM ne doit pas ralentir le détecteur
 
 
 def lire_secret(nom: str) -> str:

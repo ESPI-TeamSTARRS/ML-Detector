@@ -6,7 +6,9 @@ Points clés :
     (app/domaine/features.py), pour que l'entraînement et le direct voient les mêmes chiffres ;
   - pagination : Loki renvoie au plus `limit` lignes par requête, on repart donc du
     dernier horodatage + 1 ns tant qu'une page est pleine ;
-  - le service vient du label Loki (config.LOKI_LABEL_SERVICE) quand le JSON ne le contient pas.
+  - le service vient du label Loki (config.LOKI_LABEL_SERVICE) quand le JSON ne le contient pas ;
+  - une ligne qui n'est pas du JSON est lue comme une ligne de serveur web (nginx / BunkerWeb)
+    par lignes_texte.py ; les lignes contenant un motif de config.LOKI_EXCLURE (bruit) sont écartées.
 """
 import json
 import logging
@@ -16,6 +18,7 @@ import requests
 
 import config
 from app.infrastructure.sources.base import Source, extraire_timestamp
+from app.infrastructure.sources.lignes_texte import parser_ligne_texte
 
 journal = logging.getLogger(__name__)
 
@@ -32,12 +35,15 @@ class LokiSource(Source):
         self.pas = pas
         self.timeout = timeout  # secondes, par requête
         self.selecteur = selecteur or config.LOKI_SELECTEUR
+        self.exclure = tuple(config.LOKI_EXCLURE)   # ex. ("bwapi",) : vérifications de santé du WAF
 
     def _requete_page(self, debut_ns: int, fin_ns: int) -> list:
         """Une requête HTTP vers Loki. Renvoie la liste 'result' (flux). Lève RuntimeError si échec."""
         url = f"{self.loki_url}/loki/api/v1/query_range"
         params = {
-            "query": self.selecteur,
+            # Le filtre de bruit est appliqué par Loki lui-même (moins de données transférées) :
+            # {sélecteur} != "motif1" != "motif2"
+            "query": self.selecteur + "".join(f' != "{m}"' for m in self.exclure),
             "start": int(debut_ns),   # entiers en nanosecondes (pas de float : perte de précision)
             "end": int(fin_ns),
             "direction": "forward",   # du plus ancien au plus récent : nécessaire pour paginer
@@ -61,6 +67,15 @@ class LokiSource(Source):
             raise RuntimeError(f"Loki a renvoyé un résultat '{data.get('resultType')}' au lieu de 'streams'")
         return resultat
 
+    @staticmethod
+    def _lire_ligne(ligne) -> dict | None:
+        """JSON si possible (logs applicatifs), sinon ligne de serveur web (nginx / BunkerWeb)."""
+        try:
+            log = json.loads(ligne)
+        except (json.JSONDecodeError, TypeError):
+            return parser_ligne_texte(ligne)
+        return log if isinstance(log, dict) else None
+
     def lire_logs(self, debut: float, fin: float) -> list[dict]:
         """Logs bruts de la plage [debut, fin) (secondes), dans l'ordre chronologique."""
         debut_ns = int(round(debut * 1e9))
@@ -80,12 +95,11 @@ class LokiSource(Source):
                     nb_lignes += 1
                     ts_ns = int(ts_ns)
                     dernier_ns = max(dernier_ns, ts_ns)
-                    try:
-                        log = json.loads(ligne)
-                    except (json.JSONDecodeError, TypeError):
-                        continue            # ligne non JSON (démarrage, stacktrace) : ignorée
-                    if not isinstance(log, dict):
-                        continue
+                    if any(motif in ligne for motif in self.exclure):
+                        continue            # deuxième filet de sécurité si Loki n'a pas filtré
+                    log = self._lire_ligne(ligne)
+                    if log is None:
+                        continue            # ligne inexploitable (démarrage, stacktrace...) : ignorée
                     if service and "service" not in log:
                         log["service"] = service      # on n'écrase jamais le JSON
                     if extraire_timestamp(log) is None:

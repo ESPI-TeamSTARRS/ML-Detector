@@ -3,16 +3,12 @@
 services:
   ml-detector:
     build: ./ML-Detector
-    environment:
-      DETECTOR_SOURCE: loki                     # loki | push (simule = développement uniquement)
-      LOKI_URL: http://loki:3100
-      LOKI_LABEL_SERVICE: service               # nom du label Loki qui porte le nom du service
-      REMEDIATION_URL: http://remediation:8080/alertes   # à confirmer avec la remédiation
-      ALERT_TOKEN_FILE: /run/secrets/alert_token          # jamais le jeton en clair ici
-      # Mode push uniquement :
-      # INGEST_TOKEN_FILE: /run/secrets/ingest_token
+    # Toute la configuration non secrète vient du .env (modèle : .env.example), comme pour les autres services.
+    # Les jetons ne sont PAS dans le .env : seul le chemin de leur fichier secret l'est (*_FILE).
+    env_file: .env
     secrets:
       - alert_token
+      - rag_token
       # - ingest_token                          # mode push uniquement
     read_only: true            # système de fichiers en lecture seule
     cap_drop: [ALL]            # aucun privilège noyau
@@ -25,5 +21,7 @@ services:
 secrets:
   alert_token:
     file: ./secrets/alert_token   # fichier déchiffré par SOPS ou fourni par Vault, ignoré par git
+  rag_token:
+    file: ./secrets/rag_token
   # ingest_token:
   #   file: ./secrets/ingest_token

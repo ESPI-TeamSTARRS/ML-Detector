@@ -10,6 +10,7 @@ __pycache__/
 # --- Secrets : JAMAIS dans le dépôt (lus via <NOM>_FILE ou variable d'environnement) ---
 .env
 .env.*
+!.env.example
 secrets/
 *.pem
 *.key

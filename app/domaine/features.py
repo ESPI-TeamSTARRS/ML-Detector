@@ -36,8 +36,13 @@ def feature(nom: str, trou: int | str):
 
 @feature("req_count", trou=0)
 def req_count(logs: pd.DataFrame) -> pd.Series:
-    """Nombre total de requêtes par fenêtre."""
-    return logs.groupby("timestamp").size()
+    """
+    Nombre de requêtes HTTP par fenêtre.
+
+    On ne compte que les lignes qui ont un code HTTP : une ligne du journal d'erreurs du serveur
+    web (ex. « [warn] upstream timed out ») n'est pas une requête, la compter fausserait le volume.
+    """
+    return logs[logs["status_code"].notna()].groupby("timestamp").size()
 
 
 @feature("error_4xx", trou=0)

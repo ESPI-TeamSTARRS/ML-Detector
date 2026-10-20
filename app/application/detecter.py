@@ -16,7 +16,9 @@ import uuid
 from collections import deque
 from datetime import datetime, timezone
 
+from app.application.contexte_llm import construire_message
 from app.domaine.detecteur import AnomalyDetector, IncidentTracker
+from app.domaine.schema import normaliser
 from app.infrastructure.sources.base import Source
 
 log = logging.getLogger("ml-detector")
@@ -28,10 +30,17 @@ class Moteur:
     """Boucle temps réel du détecteur."""
 
     def __init__(self, detecteur: AnomalyDetector, source: Source, notificateur=None,
-                 pas: int = 10, retard: int = 0, n_consecutifs: int = 3, horloge=time.time):
+                 pas: int = 10, retard: int = 0, n_consecutifs: int = 3, horloge=time.time,
+                 notificateur_rag=None, rag_fenetre_s: int = 60, rag_max_logs: int = 200,
+                 rag_asynchrone: bool = True):
         self.detecteur = detecteur
         self.source = source
         self.notificateur = notificateur
+        # Envoi optionnel du contexte (service + logs) au LLM, UNIQUEMENT au début d'incident.
+        self.notificateur_rag = notificateur_rag
+        self.rag_fenetre_s = rag_fenetre_s
+        self.rag_max_logs = rag_max_logs
+        self.rag_asynchrone = rag_asynchrone
         self.pas = pas
         self.retard = retard
         self.horloge = horloge
@@ -39,7 +48,8 @@ class Moteur:
 
         self._verrou = threading.Lock()
         self.evenements = deque(maxlen=50)
-        self.compteurs = {"cycles": 0, "erreurs_source": 0, "alertes_envoyees": 0, "alertes_echouees": 0}
+        self.compteurs = {"cycles": 0, "erreurs_source": 0, "alertes_envoyees": 0, "alertes_echouees": 0,
+                         "contexte_llm_envoyes": 0, "contexte_llm_echoues": 0}
         self.dernier_ts = None
         self.derniere_maj = None
         self.derniere_erreur = None
@@ -92,7 +102,30 @@ class Moteur:
                     self.compteurs["alertes_envoyees"] += 1
                 else:
                     self.compteurs["alertes_echouees"] += 1
+            # Le LLM passe APRÈS la remédiation : son éventuelle lenteur ne la retarde jamais.
+            if self.notificateur_rag and evenement["evenement"] == "incident_debut":
+                self._contexte_vers_llm(evenement, fin)
         return evenement
+
+    def _contexte_vers_llm(self, evenement: dict, fin: float) -> None:
+        """Lance l'envoi du contexte au LLM (dans un fil séparé par défaut)."""
+        if self.rag_asynchrone:
+            threading.Thread(target=self._envoyer_contexte, args=(evenement, fin), daemon=True).start()
+        else:
+            self._envoyer_contexte(evenement, fin)
+
+    def _envoyer_contexte(self, evenement: dict, fin: float) -> None:
+        """Relit les logs récents du service touché, les nettoie, les envoie. Ne lève jamais."""
+        try:
+            debut = fin - self.rag_fenetre_s
+            logs = normaliser(self.source.lire_logs(debut, fin))
+            message = construire_message(evenement, logs, debut, fin, self.rag_max_logs)
+            envoye = self.notificateur_rag.envoyer(message)
+        except Exception as e:  # le LLM est accessoire : aucune erreur ne doit remonter
+            log.warning("Contexte LLM non envoyé : %s", type(e).__name__)
+            envoye = False
+        with self._verrou:
+            self.compteurs["contexte_llm_envoyes" if envoye else "contexte_llm_echoues"] += 1
 
     def boucle(self, arret: threading.Event) -> None:
         """Tourne jusqu'à ce que `arret` soit levé. Un cycle au début de chaque fenêtre."""

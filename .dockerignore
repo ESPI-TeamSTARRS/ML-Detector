@@ -5,3 +5,10 @@ data/
 tests/
 .env
 *.ipynb
+
+# Outils de développement : inutiles sur le serveur (collecte, entraînement, comparaison, relais Docker).
+# Ils restent dans le dépôt mais n'entrent pas dans l'image.
+app/presentation/cli/
+outils/
+deploiement/
+README.md
