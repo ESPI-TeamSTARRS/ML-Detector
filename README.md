@@ -78,6 +78,20 @@ python outils/relais_docker.py --compose-file ..\docker-compose.yml --url http:/
 Le jeton n'est jamais passé en argument. Si Loki est déjà alimenté par INFRA, préférer `DETECTOR_SOURCE=loki`
 (rien à lancer en plus).
 
+## Développement : lancement rapide (uv + Poe)
+
+Raccourci facultatif ; le déploiement Docker Compose reste la référence. Prérequis : [uv](https://docs.astral.sh/uv/).
+
+```powershell
+uv run poe serve-sim   # serveur en mode simulé, http://localhost:8000/health
+uv run poe serve       # serveur avec la source du .env (loki, push...)
+uv run poe test        # tests
+uv run poe --help      # liste des tâches
+```
+
+Les dépendances sont lues dans `pyproject.toml` (miroir de `requirements.txt`, que le Dockerfile utilise toujours) :
+si vous changez une version, changez-la aux deux endroits. `--reload` n'est utilisé qu'en développement.
+
 ## Service temps réel
 
 ```powershell
