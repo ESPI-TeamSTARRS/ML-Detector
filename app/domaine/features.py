@@ -31,6 +31,14 @@ def feature(nom: str, trou: int | str):
     return decorateur
 
 
+def _est_evenement(logs: pd.DataFrame) -> pd.Series:
+    """Vrai pour les lignes qui sont une requête (code HTTP) ou un événement applicatif (outcome)."""
+    masque = logs["status_code"].notna()
+    if "outcome" in logs.columns:
+        masque = masque | (logs["outcome"].fillna("") != "")
+    return masque
+
+
 # --- FEATURES ---
 # Chaque fonction reçoit un DataFrame normalisé et retourne une Series (index=timestamps).
 
@@ -39,10 +47,11 @@ def req_count(logs: pd.DataFrame) -> pd.Series:
     """
     Nombre de requêtes HTTP par fenêtre.
 
-    On ne compte que les lignes qui ont un code HTTP : une ligne du journal d'erreurs du serveur
-    web (ex. « [warn] upstream timed out ») n'est pas une requête, la compter fausserait le volume.
+    On ne compte que les lignes qui décrivent une requête ou un événement applicatif (code HTTP
+    OU champ `outcome`) : une ligne du journal d'erreurs du serveur web (ex. « [warn] upstream
+    timed out ») n'est pas une requête, la compter fausserait le volume.
     """
-    return logs[logs["status_code"].notna()].groupby("timestamp").size()
+    return logs[_est_evenement(logs)].groupby("timestamp").size()
 
 
 @feature("error_4xx", trou=0)
@@ -57,6 +66,33 @@ def error_5xx(logs: pd.DataFrame) -> pd.Series:
     """Nombre d'erreurs 5xx par fenêtre."""
     erreurs = logs[logs["status_code"] >= 500]
     return erreurs.groupby("timestamp").size()
+
+
+@feature("denied_count", trou=0)
+def denied_count(logs: pd.DataFrame) -> pd.Series:
+    """
+    Nombre d'événements refusés (outcome = "denied") par fenêtre.
+
+    Utile quand les logs n'ont pas de code HTTP : un brute force sur l'authentification
+    ou une rafale de paiements refusés fait monter ce compteur.
+    """
+    if "outcome" not in logs.columns:
+        return pd.Series(dtype=float)
+    return logs[logs["outcome"] == "denied"].groupby("timestamp").size()
+
+
+@feature("non_success_count", trou=0)
+def non_success_count(logs: pd.DataFrame) -> pd.Series:
+    """
+    Nombre d'événements dont le résultat n'est PAS "success" (refus, erreurs, échecs...) par fenêtre.
+
+    On compte « tout sauf success » plutôt que de lister les valeurs d'échec : ainsi une valeur
+    inattendue (error, failure, timeout...) est quand même vue.
+    """
+    if "outcome" not in logs.columns:
+        return pd.Series(dtype=float)
+    resultat = logs["outcome"].fillna("")
+    return logs[(resultat != "") & (resultat != "success")].groupby("timestamp").size()
 
 
 @feature("error_logs", trou=0)

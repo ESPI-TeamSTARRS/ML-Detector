@@ -13,6 +13,11 @@ import config
 from app.infrastructure.sources.base import Source
 
 
+def _resultat(status_code) -> str:
+    """Résultat applicatif déduit du code HTTP (même vocabulaire que les logs Basecamp)."""
+    return "error" if status_code >= 500 else "denied" if status_code >= 400 else "success"
+
+
 class SimulationSource(Source):
     """
     Simule une plateforme avec logs réalistes et incidents injectables.
@@ -103,6 +108,7 @@ class SimulationSource(Source):
                         "level": "ERROR" if status_code >= 500 else "WARN" if status_code >= 400 else "INFO",
                         "status_code": status_code,
                         "duration_ms": duration_ms,
+                        "outcome": _resultat(status_code),
                     }
                     logs.append(log)
 
@@ -130,6 +136,7 @@ class SimulationSource(Source):
                             "status_code": 500 if self.rng.random() < 0.1 else 200,
                             "duration_ms": max(0, self.rng.normal(500, 100)),
                         })
+                        logs[-1]["outcome"] = _resultat(logs[-1]["status_code"])
 
             elif type_inc == "panne":
                 # Erreurs 5xx + latence élevée
@@ -142,6 +149,7 @@ class SimulationSource(Source):
                             "level": "ERROR",
                             "status_code": 500,
                             "duration_ms": max(0, self.rng.normal(300, 50)),
+                            "outcome": "error",
                         })
 
             elif type_inc == "brute_force":
@@ -155,6 +163,7 @@ class SimulationSource(Source):
                             "level": "WARN",
                             "status_code": 401 + self.rng.integers(0, 3),
                             "duration_ms": max(0, self.rng.normal(50, 10)),
+                            "outcome": "denied",
                         })
 
         # Garde uniquement [debut, fin) : la première fenêtre peut commencer avant `debut`.

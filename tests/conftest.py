@@ -13,6 +13,28 @@ import config
 T0 = 1_700_000_000 // 10 * 10  # un début de fenêtre de 10 s (multiple de 10)
 
 
+SERVICES_TEST = {
+    "api":   {"criticite": 4, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
+    "auth":  {"criticite": 3, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
+    "front": {"criticite": 2, "features": ["req_count", "error_5xx"]},
+}
+
+# Les VRAIS services de config.py, gardés de côté pour test_logs_basecamp.py.
+SERVICES_REELS = {k: dict(v) for k, v in config.SERVICES.items()}
+
+# Les tests ne doivent pas dépendre des vrais services de config.py (qui changent avec l'équipe) :
+# on impose un jeu de services de test fixe, DÈS le chargement de ce fichier. Surtout pas dans une
+# fixture : pytest crée d'abord les fixtures de portée "module" (ex. `detecteur`, `donnees`), qui
+# verraient alors encore les vrais services.
+config.SERVICES = {k: dict(v) for k, v in SERVICES_TEST.items()}
+
+
+@pytest.fixture
+def services_reels():
+    """Les vrais services de config.py (pour les tests du format de logs réel)."""
+    return SERVICES_REELS
+
+
 @pytest.fixture
 def services_mini(monkeypatch):
     """

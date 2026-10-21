@@ -78,20 +78,6 @@ python outils/relais_docker.py --compose-file ..\docker-compose.yml --url http:/
 Le jeton n'est jamais passé en argument. Si Loki est déjà alimenté par INFRA, préférer `DETECTOR_SOURCE=loki`
 (rien à lancer en plus).
 
-## Développement : lancement rapide (uv + Poe)
-
-Raccourci facultatif ; le déploiement Docker Compose reste la référence. Prérequis : [uv](https://docs.astral.sh/uv/).
-
-```powershell
-uv run poe serve-sim   # serveur en mode simulé, http://localhost:8000/health
-uv run poe serve       # serveur avec la source du .env (loki, push...)
-uv run poe test        # tests
-uv run poe --help      # liste des tâches
-```
-
-Les dépendances sont lues dans `pyproject.toml` (miroir de `requirements.txt`, que le Dockerfile utilise toujours) :
-si vous changez une version, changez-la aux deux endroits. `--reload` n'est utilisé qu'en développement.
-
 ## Service temps réel
 
 ```powershell
@@ -105,12 +91,21 @@ Extrait de compose : `deploiement/docker-compose.extrait.yml`.
 
 ## Format des logs lus dans Loki
 
-Le détecteur lit deux formats : du **JSON** (champs `timestamp`, `service`, `level`, `status_code`, `duration_ms`) ou des
-**lignes de serveur web nginx / BunkerWeb** (`app/infrastructure/sources/lignes_texte.py`) : une ligne d'accès donne le
-code HTTP et le niveau, une ligne du journal d'erreurs donne le niveau. L'heure vient de Loki, le service d'un label
-(`LOKI_LABEL_SERVICE`). Seuls des nombres et un niveau sont extraits, jamais de texte libre. **Limite** : le format
-d'accès actuel ne contient pas de durée de requête ; sans `$request_time` dans le log, les features de latence
-(`latency_avg_ms`, `latency_p95_ms`) valent 0 et doivent être retirées de `config.SERVICES`.
+Format principal : les **logs JSON de l'équipe DEV** (une ligne par événement), par exemple :
+
+```json
+{"timestamp":"2026-10-20T17:03:05.730Z","service":"basecamp-payment","level":"warning","event":"payment.intent_rejected","outcome":"denied","reason":"amount_exceeds_limit", ...}
+```
+
+Le détecteur n'en retient que `timestamp`, `service`, `level`, `outcome` et (si présent) `duration_ms`. Ces logs n'ont
+**pas de code HTTP** : les features comptent donc les événements (`req_count`), les refus (`denied_count`, `outcome` =
+`denied`), tout ce qui n'est pas un succès (`non_success_count`) et les niveaux `error` et plus (`error_logs`). Seul le
+service shop envoie `duration_ms` (sur les devis acceptés) : la latence n'est suivie que pour lui. `event`, `reason`,
+`correlation_id` et `attributes` sont volontairement ignorés (texte libre / données personnelles).
+
+Le détecteur lit aussi des **lignes de serveur web nginx / BunkerWeb** (`app/infrastructure/sources/lignes_texte.py`) :
+une ligne d'accès donne le code HTTP et le niveau. Le service vient alors d'un label Loki (`LOKI_LABEL_SERVICE`) ;
+tant que ce service n'est pas dans `config.SERVICES`, ces lignes sont ignorées.
 
 ## Configuration par `.env`
 

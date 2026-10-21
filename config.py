@@ -56,9 +56,15 @@ CORRESPONDANCE_CHAMPS = {}
 # Les noms doivent être EXACTEMENT ceux des logs / du label Loki.
 # Un service absent d'ici n'est jamais surveillé (limite à citer dans le dossier).
 SERVICES = {
-    "api":   {"criticite": 4, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
-    "auth":  {"criticite": 3, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
-    "front": {"criticite": 2, "features": ["req_count", "error_5xx"]},
+    # Noms EXACTS du champ "service" des logs JSON de l'équipe DEV (préfixe "basecamp-").
+    # Ces logs n'ont pas de code HTTP : on compte les événements (req_count), les refus
+    # (denied_count : outcome = "denied") et tout ce qui n'est pas un succès (non_success_count).
+    # Criticités PROVISOIRES : à remplacer par celles de l'analyse EBIOS.
+    "basecamp-payment": {"criticite": 4, "features": ["req_count", "denied_count", "non_success_count", "error_logs"]},
+    "basecamp-auth":    {"criticite": 3, "features": ["req_count", "denied_count", "non_success_count", "error_logs"]},
+    # Seul le shop envoie duration_ms (sur les devis acceptés) : les latences n'ont de sens que là.
+    "basecamp-shop":    {"criticite": 3, "features": ["req_count", "denied_count", "non_success_count", "error_logs",
+                                                    "latency_avg_ms"]},
 }
 
 # --- Modèle (décisions D2/D3) --------------------------------------------------

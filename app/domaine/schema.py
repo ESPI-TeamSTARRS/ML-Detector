@@ -4,12 +4,12 @@ SCHÉMA : normalise les logs bruts en DataFrame structuré.
 Toutes les sources (Loki, push, fichier, simulation) convergeront ici.
 Les logs entrent sous différents formats, on les normalise :
   - champs obligatoires : timestamp, service
-  - champs optionnels : level, status_code, duration_ms
+  - champs optionnels : level, status_code, duration_ms, outcome
   - applique la correspondance des noms (config.CORRESPONDANCE_CHAMPS)
   - rejette les logs sans champ obligatoire ou service non surveillé
   - accepte timestamp en ISO 8601 UTC ou epoch (s/ms/ns)
 
-Résultat : DataFrame [timestamp(s), service, level, status_code, duration_ms]
+Résultat : DataFrame [timestamp(s), service, level, status_code, duration_ms, outcome]
 """
 import math
 from datetime import datetime, timezone
@@ -19,7 +19,7 @@ import pandas as pd
 import config
 
 
-COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms"]
+COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms", "outcome"]
 
 # Noms usuels cherchés si CORRESPONDANCE_CHAMPS ne dit rien (ou si le champ relié manque).
 NOMS_USUELS = {
@@ -28,15 +28,17 @@ NOMS_USUELS = {
     "level": ["level", "severity", "sev", "lvl"],
     "status_code": ["status_code", "status", "code", "http_status"],
     "duration_ms": ["duration_ms", "duration", "latency", "latency_ms"],
+    # Résultat d'un événement applicatif (format des services Basecamp) : success / denied / ...
+    "outcome": ["outcome", "result"],
 }
 
 
 def _vide() -> pd.DataFrame:
-    """DataFrame vide MAIS avec les bonnes colonnes : le reste du code n'a pas de cas spécial."""
+    # DataFrame vide MAIS avec les bonnes colonnes : le reste du code n'a pas de cas spécial.
     return pd.DataFrame({
         "timestamp": pd.Series(dtype=float), "service": pd.Series(dtype=object),
         "level": pd.Series(dtype=object), "status_code": pd.Series(dtype=float),
-        "duration_ms": pd.Series(dtype=float),
+        "duration_ms": pd.Series(dtype=float), "outcome": pd.Series(dtype=object),
     })
 
 
@@ -125,12 +127,15 @@ def normaliser(logs: list[dict]) -> pd.DataFrame:
         _, level = _lire_champ(log_brut, "level", correspondance)
         _, status = _lire_champ(log_brut, "status_code", correspondance)
         _, duree = _lire_champ(log_brut, "duration_ms", correspondance)
+        _, resultat = _lire_champ(log_brut, "outcome", correspondance)
         lignes.append({
             "timestamp": ts,
             "service": service,
             "level": level.strip().upper() if isinstance(level, str) else "",
             "status_code": status,
             "duration_ms": duree,
+            # minuscules : "Denied" et "denied" doivent compter pareil ; "" = champ absent
+            "outcome": resultat.strip().lower() if isinstance(resultat, str) else "",
         })
 
     if not lignes:

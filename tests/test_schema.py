@@ -5,7 +5,7 @@ import pytest
 import config
 from app.domaine.schema import normaliser
 
-COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms"]
+COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms", "outcome"]
 # 2026-10-20T09:15:20Z en secondes depuis 1970
 EPOCH = 1792487720.0
 
