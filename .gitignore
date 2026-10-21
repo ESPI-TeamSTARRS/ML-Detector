@@ -28,3 +28,5 @@ Thumbs.db
 # --- Divers ---
 *.log
 *.ipynb
+# Exception : les notebooks d'analyse du dossier sont versionnés.
+!notebooks/*.ipynb

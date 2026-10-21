@@ -22,6 +22,8 @@ package = false
 
 [dependency-groups]
 dev = [
+    "jupyterlab>=4.6.4",
+    "matplotlib>=3.11.2",
     "poethepoet>=0.49.0",
     "pytest>=9.1.1",
 ]
