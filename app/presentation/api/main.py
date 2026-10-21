@@ -14,6 +14,7 @@ from fastapi import FastAPI
 
 import config
 from app.domaine.detecteur import AnomalyDetector
+from app.domaine.silence import avec_silence
 from app.application.alerter import NotificateurRemediation
 from app.application.contexte_llm import NotificateurRAG
 from app.application.detecter import Moteur
@@ -56,7 +57,7 @@ def construire_moteur() -> Moteur:
         raise ValueError(f"SOURCE inconnue : {config.SOURCE}")
 
     return Moteur(
-        detecteur=charger_detecteur(simule),
+        detecteur=avec_silence(charger_detecteur(simule)),
         source=source,
         notificateur=NotificateurRemediation(config.REMEDIATION_URL, config.lire_secret("ALERT_TOKEN")),
         notificateur_rag=(NotificateurRAG(config.RAG_URL, config.lire_secret("RAG_TOKEN"), config.RAG_TIMEOUT_S)

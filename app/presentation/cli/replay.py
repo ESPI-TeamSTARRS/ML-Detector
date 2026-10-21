@@ -11,6 +11,7 @@ import pandas as pd
 import config
 from app.application.entrainer import ErreurDonnees, charger_csv
 from app.domaine.detecteur import AnomalyDetector, IncidentTracker
+from app.domaine.silence import avec_silence
 
 EXEMPLES = """exemple (PowerShell, depuis le dossier ml-detector) :
   python -m app.presentation.cli.replay --data data/incident_simule.csv --modele models/detecteur.joblib
@@ -64,7 +65,7 @@ def main(argv=None) -> int:
         manquantes = set(detecteur.features) - set(df.columns)
         if manquantes:
             raise ErreurDonnees(f"Le CSV n'a pas les colonnes attendues par le modèle : {sorted(manquantes)}")
-        tracker = IncidentTracker(detecteur, n_consecutifs=args.n)
+        tracker = IncidentTracker(avec_silence(detecteur), n_consecutifs=args.n)  # comme en direct
         evenements = []
         for i in range(len(df)):
             ev = tracker.mettre_a_jour(df.iloc[[i]])

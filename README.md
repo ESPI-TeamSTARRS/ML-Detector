@@ -132,6 +132,18 @@ n'exécute rien de ce que le LLM répond.
 (`id`, `detecteur`, `horodatage`, `evenement`, `timestamp`, `score`, `gravite`, `service`, `intensite`,
 `features_principales`) et `incident_fin` (`service`, `duree_s`). Contrat partagé : ne pas le modifier sans prévenir.
 
+## Règle « silence » (pannes)
+
+Une chute à 0 requête n'est pas vue par le modèle (0 reste dans la plage statistique d'un trafic de 9 requêtes en
+moyenne) et un entraînement sur du trafic normal ne contient jamais de panne. Une règle simple, `app/domaine/silence.py`,
+s'ajoute **autour** du détecteur sans le modifier : un service dont la moyenne apprise est d'au moins
+`SILENCE_TRAFIC_MIN` requêtes par photo (3 par défaut) et qui tombe à 0 est jugé anormal, avec la même règle de
+`N_CONSECUTIFS` photos d'affilée. L'alerte est inchangée (même contrat) ; l'intensité est forcée au maximum, donc la
+gravité est haute. Un service naturellement calme n'est jamais signalé. Désactivation : `SILENCE_ACTIF=0` (`config.py`).
+
+Limites : une panne de moins de 3 photos (30 s) n'est pas signalée ; une panne de la collecte des logs (Loki, relais) ressemble
+à une panne du service. Les healthchecks Docker et Prometheus restent l'outil principal pour les pannes.
+
 ## Sécurité
 
 Aucun secret dans le dépôt (`<NOM>_FILE` ou variable d'environnement) ; conteneur non-root, `read_only`,

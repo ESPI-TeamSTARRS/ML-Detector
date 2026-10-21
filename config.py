@@ -80,6 +80,14 @@ MODEL_PATH = os.getenv("MODEL_PATH", "models/detecteur.joblib")
 # --- Alertes (décision D5) -----------------------------------------------------
 # Nombre de photos anormales d'affilée avant d'alerter (et normales avant de clore).
 N_CONSECUTIFS = int(os.getenv("N_CONSECUTIFS", "3"))
+# --- Règle « silence » (pannes : chute à 0 requête, que le modèle ne voit pas) ------------------
+# Un service habituellement actif (au moins SILENCE_TRAFIC_MIN requêtes par photo en moyenne à l'entraînement)
+# qui tombe à 0 requête est signalé, avec les mêmes N photos d'affilée. Mettre SILENCE_ACTIF=0 pour désactiver.
+SILENCE_ACTIF = os.getenv("SILENCE_ACTIF", "1") == "1"
+SILENCE_TRAFIC_MIN = float(os.getenv("SILENCE_TRAFIC_MIN", "3"))
+# Intensité d'un silence (écarts-types) : une panne totale vaut le niveau maximal de gravité (>= 12).
+SILENCE_INTENSITE = float(os.getenv("SILENCE_INTENSITE", "12"))
+
 # URL du moteur de remédiation. Vide = les alertes sont seulement journalisées.
 REMEDIATION_URL = os.getenv("REMEDIATION_URL", "")
 

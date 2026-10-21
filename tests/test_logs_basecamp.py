@@ -31,15 +31,26 @@ AUTH_ECHEC = ('{"timestamp":"2026-10-20T17:04:22.208Z","service":"basecamp-auth"
 LOGS = [json.loads(x) for x in (SHOP_OK, SHOP_REFUSE, PAIEMENT_REFUSE, AUTH_ECHEC)]
 
 
+# Les trois services du format DEV, avec les features de config.py. Écrits ici (et non lus dans config.py) car
+# config.py peut n'en surveiller qu'une partie (auth et payment sont désactivés tant qu'ils n'ont pas de trafic).
+FEATURES_BASECAMP = ["req_count", "denied_count", "non_success_count", "error_logs"]
+SERVICES_BASECAMP = {
+    "basecamp-payment": {"criticite": 4, "features": FEATURES_BASECAMP},
+    "basecamp-auth": {"criticite": 3, "features": FEATURES_BASECAMP},
+    "basecamp-shop": {"criticite": 3, "features": [*FEATURES_BASECAMP, "latency_avg_ms"]},
+}
+
+
 @pytest.fixture(autouse=True)
-def vrais_services(monkeypatch, services_reels):
-    """Remet les VRAIS services de config.py (le conftest impose sinon un jeu de services de test)."""
-    monkeypatch.setattr("config.SERVICES", {k: dict(v) for k, v in services_reels.items()})
+def vrais_services(monkeypatch):
+    """Impose les trois services du format DEV (le conftest impose sinon un jeu de services de test)."""
+    monkeypatch.setattr("config.SERVICES", {k: dict(v) for k, v in SERVICES_BASECAMP.items()})
 
 
 def test_les_services_de_config_sont_ceux_des_logs(services_reels):
     # Garde-fou : config.py doit nommer les services exactement comme le champ "service" des logs de DEV.
-    assert set(services_reels) == {"basecamp-shop", "basecamp-payment", "basecamp-auth"}
+    # Il peut n'en surveiller qu'une partie (temporaire), jamais un nom inconnu.
+    assert services_reels and set(services_reels) <= set(SERVICES_BASECAMP)
 
 
 def test_normalisation_des_quatre_exemples():
