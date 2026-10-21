@@ -1,0 +1,28 @@
+{
+  "date_utc": "2026-10-21T13:01:08+00:00",
+  "type_modele": "isolation_forest",
+  "params_modele": {
+    "contamination": 0.01,
+    "n_estimators": 200,
+    "random_state": 42
+  },
+  "features_par_service": {
+    "basecamp-shop": [
+      "basecamp-shop__req_count",
+      "basecamp-shop__denied_count",
+      "basecamp-shop__non_success_count"
+    ]
+  },
+  "nb_photos_entrainement": 388,
+  "version_sklearn": "1.6.1",
+  "moyenne": {
+    "basecamp-shop__req_count": 9.533505154639176,
+    "basecamp-shop__denied_count": 0.06701030927835051,
+    "basecamp-shop__non_success_count": 0.06701030927835051
+  },
+  "ecart_type": {
+    "basecamp-shop__req_count": 5.95212693684575,
+    "basecamp-shop__denied_count": 1.0,
+    "basecamp-shop__non_success_count": 1.0
+  }
+}
