@@ -7,7 +7,6 @@ Tous respectent : decision_function(X) < 0  <=>  anormal
   2. lof : Local Outlier Factor avec StandardScaler (D3)
   3. statistique : référence simple (écarts-types) (D3)
 """
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -87,7 +86,10 @@ class LOFModele(ModeleBase):
 
 
 class StatistiqueModele(ModeleBase):
-    """Modèle « statistique » : alerte si une colonne s'écarte de plus de N écarts-types (en plus OU en moins). Référence simple."""
+    """Modèle « statistique » : alerte si une colonne s'écarte de plus de N écarts-types (en plus OU en moins).
+
+    Référence simple.
+    """
 
     def __init__(self, seuil_ecarts_types: float = 3.0):
         self.seuil = seuil_ecarts_types
@@ -125,6 +127,5 @@ MODELES_DISPONIBLES = {
 def creer_modele(type_modele: str, **kwargs) -> ModeleBase:
     """Factory pour créer un modèle par son type."""
     if type_modele not in MODELES_DISPONIBLES:
-        raise ValueError(f"Type de modèle inconnu : {type_modele}. "
-                         f"Disponibles : {list(MODELES_DISPONIBLES.keys())}")
+        raise ValueError(f"Type de modèle inconnu : {type_modele}. Disponibles : {list(MODELES_DISPONIBLES.keys())}")
     return MODELES_DISPONIBLES[type_modele](**kwargs)

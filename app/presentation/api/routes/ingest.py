@@ -1,5 +1,4 @@
 """Route /ingest : recevoir des logs (MODE PUSH UNIQUEMENT)."""
-from typing import List
 
 from fastapi import Header, HTTPException
 from pydantic import BaseModel
@@ -11,7 +10,7 @@ TAILLE_MAX_LOT = 10000
 
 
 class LotDeLogs(BaseModel):
-    logs: List[dict]
+    logs: list[dict]
 
 
 def creer_routes_ingest(app):

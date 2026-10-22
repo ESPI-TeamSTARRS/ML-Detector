@@ -5,17 +5,17 @@ Contrat :
   - lire_logs(debut, fin) -> list[dict] : logs bruts (peuvent être vides ou partiels)
   - fetch(debut, fin) -> DataFrame : logs normalisés + features calculées
 """
+
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import pandas as pd
 
 import config
-from app.domaine.schema import normaliser, _normaliser_timestamp
 from app.domaine.features import construire_tableau
+from app.domaine.schema import _normaliser_timestamp, normaliser
 
 
-def extraire_timestamp(log: dict) -> Optional[float]:
+def extraire_timestamp(log: dict) -> float | None:
     """
     Donne l'instant d'un log brut en secondes (float), ou None s'il n'en a pas d'exploitable.
 

@@ -1,4 +1,15 @@
 .venv/
+.git/
+.github/
+.mypy_cache/
+.ruff_cache/
+.coverage
+notebooks/
+scripts/
+BENCHMARK.md
+.pre-commit-config.yaml
+.gitleaks.toml
+.trivyignore
 __pycache__/
 .pytest_cache/
 data/

@@ -11,9 +11,10 @@ deux endroits qui doivent voir exactement la même chose :
   - FichierSource (fichiers .log/.txt pour l'entraînement hors ligne)
   - outils/relais_docker.py (flux en direct sur la machine hôte)
 """
+
 import json
 import re
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 # "<préfixe>  | <reste>" : le préfixe n'a pas d'espace, le séparateur est " | " (espaces de
 # remplissage variables : docker aligne les noms de conteneurs).
@@ -44,7 +45,7 @@ def deduire_service(prefixe: str, services_connus: Iterable[str]) -> str:
     return nettoye
 
 
-def parser_ligne_docker(ligne: str, services_connus: Iterable[str]) -> Optional[dict]:
+def parser_ligne_docker(ligne: str, services_connus: Iterable[str]) -> dict | None:
     """
     Renvoie le log brut (dict) contenu dans la ligne, ou None si elle n'est pas
     exploitable (ligne vide, message non-JSON, JSON qui n'est pas un objet...).

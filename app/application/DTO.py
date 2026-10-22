@@ -14,6 +14,7 @@ Règles de sécurité encodées ici (voir contexte_llm.py pour les raisons) :
 Afficher le schéma JSON (à donner à la personne qui fait le RAG) :
     python -m app.application.DTO
 """
+
 from __future__ import annotations
 
 import json
@@ -29,32 +30,38 @@ Niveau = Literal["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL
 
 class _Base(BaseModel):
     """Base commune : refuse tout champ non déclaré."""
+
     model_config = ConfigDict(extra="forbid")
 
 
 class FeaturePrincipaleDTO(_Base):
     """Une mesure qui s'écarte de la normale."""
+
     feature: str = Field(description="Nom de la mesure, forme <service>__<mesure> (ex. basecamp-auth__denied_count)")
     ecart_types: float = Field(description="Écart à la moyenne normale, en écarts-types (négatif = chute)")
 
 
 class FenetreDTO(_Base):
     """Période couverte par les logs joints."""
+
     debut: datetime
     fin: datetime
 
 
 class LogDTO(_Base):
     """Un log nettoyé : 4 champs seulement, jamais de texte libre."""
+
     timestamp: datetime
     level: Niveau = Field(description="Niveau du log ; toute valeur inconnue a été remplacée par AUTRE")
-    status_code: int | None = Field(default=None, ge=100, le=599,
-                                    description="Code HTTP ; vide pour les logs applicatifs Basecamp")
+    status_code: int | None = Field(
+        default=None, ge=100, le=599, description="Code HTTP ; vide pour les logs applicatifs Basecamp"
+    )
     duration_ms: float | None = Field(default=None, ge=0, description="Durée en millisecondes, si connue")
 
 
 class ContexteIncidentDTO(_Base):
     """Message envoyé UNE fois, au début d'un incident (POST vers RAG_URL, en-tête Bearer)."""
+
     type: Literal["contexte_incident"] = "contexte_incident"
     incident_id: str = Field(description="Même identifiant que l'alerte envoyée à la remédiation")
     detecteur: str = Field(description="Toujours ml-detector")

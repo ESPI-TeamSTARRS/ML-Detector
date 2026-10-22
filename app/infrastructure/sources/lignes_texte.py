@@ -14,6 +14,7 @@ On n'en extrait QUE des nombres et un niveau (code HTTP, durée, niveau) : jamai
 L'heure et le service viennent de Loki (horodatage de réception et labels), pas de la ligne.
 Cette fonction est PURE (pas de réseau) : elle se teste avec de simples chaînes.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,14 +22,22 @@ import re
 # Ligne d'accès : [date] "METHODE chemin protocole" code octets   (nginx combined et variantes)
 _ACCES = re.compile(r'\[[^\]]+\]\s+"(?P<methode>[A-Z]+)\s+\S+[^"]*"\s+(?P<code>\d{3})\s+(?:\d+|-)')
 # Durée éventuelle, si INFRA ajoute $request_time au format de log : rt=0.123 / request_time=0.123
-_DUREE_CLE = re.compile(r'\b(?:rt|request_time|urt)=(?P<s>\d+(?:\.\d+)?)')
+_DUREE_CLE = re.compile(r"\b(?:rt|request_time|urt)=(?P<s>\d+(?:\.\d+)?)")
 # ... ou un nombre décimal collé à la fin de la ligne, après le user-agent entre guillemets
 _DUREE_FIN = re.compile(r'"\s+(?P<s>\d+\.\d{1,6})\s*$')
 # Journal d'erreurs nginx : 2026/10/20 12:10:38 [warn] ...
-_ERREUR = re.compile(r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(?P<niveau>[a-z]+)\]')
+_ERREUR = re.compile(r"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(?P<niveau>[a-z]+)\]")
 
-_NIVEAUX_ERREUR = {"debug": "DEBUG", "info": "INFO", "notice": "INFO", "warn": "WARN",
-                   "error": "ERROR", "crit": "CRITICAL", "alert": "CRITICAL", "emerg": "CRITICAL"}
+_NIVEAUX_ERREUR = {
+    "debug": "DEBUG",
+    "info": "INFO",
+    "notice": "INFO",
+    "warn": "WARN",
+    "error": "ERROR",
+    "crit": "CRITICAL",
+    "alert": "CRITICAL",
+    "emerg": "CRITICAL",
+}
 
 
 def _niveau_http(code: int) -> str:
@@ -36,7 +45,7 @@ def _niveau_http(code: int) -> str:
     return "ERROR" if code >= 500 else "WARN" if code >= 400 else "INFO"
 
 
-def parser_ligne_texte(ligne: str) -> dict | None:
+def parser_ligne_texte(ligne: object) -> dict | None:
     """
     Renvoie un log brut partiel {level, status_code[, duration_ms]} ou None si la ligne
     n'est ni une ligne d'accès ni une ligne du journal d'erreurs.

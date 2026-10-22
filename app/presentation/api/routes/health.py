@@ -1,4 +1,5 @@
 """Route /health : vérifier que la boucle tourne."""
+
 from fastapi import Response
 
 

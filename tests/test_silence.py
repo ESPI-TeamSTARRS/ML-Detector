@@ -1,4 +1,5 @@
 """Tests de app/domaine/silence.py : la règle silence (panne = chute à 0 requête) autour du détecteur."""
+
 from types import SimpleNamespace
 
 import pandas as pd
@@ -24,19 +25,24 @@ def enveloppe(det):
 @pytest.fixture
 def muette(ligne_normale):
     """Fabrique une photo où les services de `muets` sont à 0 requête (le reste est typique)."""
+
     def fabrique(ts: int, muets=("api",)):
         ligne = ligne_normale(ts)
         for service in muets:
             ligne[f"{service}__req_count"] = 0.0
         return ligne
+
     return fabrique
 
 
 # --- RegleSilence ---------------------------------------------------------------
 
+
 def faux_detecteur(moyennes: dict):
-    return SimpleNamespace(features_par_service={s: [f"{s}__req_count"] for s in moyennes},
-                           moyenne=pd.Series({f"{s}__req_count": m for s, m in moyennes.items()}))
+    return SimpleNamespace(
+        features_par_service={s: [f"{s}__req_count"] for s in moyennes},
+        moyenne=pd.Series({f"{s}__req_count": m for s, m in moyennes.items()}),
+    )
 
 
 def photos(valeurs: dict) -> pd.DataFrame:
@@ -55,7 +61,8 @@ def test_service_calme_n_est_jamais_silencieux():
 
 def test_un_seul_service_silencieux_parmi_deux():
     res = RegleSilence(3.0).services_silencieux(
-        photos({"a__req_count": [0.0, 0.0], "b__req_count": [7.0, 7.0]}), faux_detecteur({"a": 9.0, "b": 9.0}))
+        photos({"a__req_count": [0.0, 0.0], "b__req_count": [7.0, 7.0]}), faux_detecteur({"a": 9.0, "b": 9.0})
+    )
     assert res["a"].all() and not res["b"].any()
 
 
@@ -72,6 +79,7 @@ def test_regle_refuse_les_valeurs_invalides(kwargs):
 
 # --- DetecteurAvecSilence : score -----------------------------------------------
 
+
 def test_photo_silencieuse_est_anormale_et_designe_le_service(enveloppe, muette):
     res = enveloppe.score(muette(T)).iloc[0]
     assert bool(res["anomalie"]) is True
@@ -80,7 +88,7 @@ def test_photo_silencieuse_est_anormale_et_designe_le_service(enveloppe, muette)
 
 
 def test_le_modele_seul_ne_voyait_pas_la_panne(det, muette):
-    """Justifie la règle : sans elle, la chute à 0 d'un service qui tourne à 20 req/photo reste « normale » (score > 0)."""
+    """Justifie la règle : sans elle, la chute à 0 d'un service à 20 req/photo reste « normale » (score > 0)."""
     res = det.score(muette(T)).iloc[0]
     assert bool(res["anomalie"]) is False
     assert res["score_api"] > 0
@@ -103,6 +111,7 @@ def test_silence_multiple_designe_le_service_le_plus_critique(enveloppe, muette)
 
 
 # --- DetecteurAvecSilence : explication et incidents ----------------------------
+
 
 def test_expliquer_force_l_intensite_d_un_silence(enveloppe, det, muette):
     ligne = muette(T)
@@ -146,6 +155,7 @@ def test_sans_la_regle_la_panne_n_est_pas_signalee(det, muette):
 
 # --- Enveloppe transparente et interrupteur --------------------------------------
 
+
 def test_enveloppe_transmet_les_attributs_du_detecteur(enveloppe, det):
     assert enveloppe.features == det.features
     assert enveloppe.features_par_service == det.features_par_service
@@ -154,7 +164,7 @@ def test_enveloppe_transmet_les_attributs_du_detecteur(enveloppe, det):
 
 def test_attribut_inexistant_leve_attributerror(enveloppe):
     with pytest.raises(AttributeError):
-        enveloppe.attribut_qui_n_existe_pas
+        _ = enveloppe.attribut_qui_n_existe_pas
 
 
 def test_avec_silence_enveloppe_quand_actif(det, monkeypatch):

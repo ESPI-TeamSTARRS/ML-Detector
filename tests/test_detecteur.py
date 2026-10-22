@@ -1,8 +1,8 @@
 """Tests de app/domaine/detecteur.py : un modèle par service, explication, gravité, incidents, sauvegarde."""
+
 import json
 import warnings
 
-import pandas as pd
 import pytest
 
 import config
@@ -16,6 +16,7 @@ def det(normal):
 
 
 # --- Construction ---------------------------------------------------------------
+
 
 def test_defauts_viennent_de_config():
     d = AnomalyDetector()
@@ -40,6 +41,7 @@ def test_service_de():
 
 
 # --- Entraînement / score -------------------------------------------------------
+
 
 def test_un_modele_par_service(det):
     assert sorted(det.modeles) == sorted(config.SERVICES)
@@ -90,6 +92,7 @@ def test_service_designe_correct(det, ligne_normale, service):
 
 # --- expliquer ------------------------------------------------------------------
 
+
 def test_expliquer(det, ligne_anormale):
     e = det.expliquer(ligne_anormale(0, "auth"), "auth")
     assert e["service"] == "auth"
@@ -120,21 +123,25 @@ def test_expliquer_plancher_ecart_type(det, ligne_normale):
 
 # --- gravité --------------------------------------------------------------------
 
-@pytest.mark.parametrize("service, intensite, attendu", [
-    ("api", 3, "moyenne"),       # 4 x 1 = 4
-    ("api", 7, "elevee"),        # 4 x 2 = 8
-    ("api", 15, "critique"),     # 4 x 3 = 12
-    ("auth", 3, "moyenne"),      # 3 x 1 = 3
-    ("auth", 7, "elevee"),       # 3 x 2 = 6
-    ("auth", 15, "critique"),    # 3 x 3 = 9
-    ("front", 3, "faible"),      # 2 x 1 = 2
-    ("front", 7, "moyenne"),     # 2 x 2 = 4
-    ("front", 15, "elevee"),     # 2 x 3 = 6
-    ("api", 5.99, "moyenne"),    # frontière : < 6 -> niveau 1
-    ("api", 6, "elevee"),        # >= 6 -> niveau 2
-    ("api", 11.99, "elevee"),
-    ("api", 12, "critique"),     # >= 12 -> niveau 3
-])
+
+@pytest.mark.parametrize(
+    "service, intensite, attendu",
+    [
+        ("api", 3, "moyenne"),  # 4 x 1 = 4
+        ("api", 7, "elevee"),  # 4 x 2 = 8
+        ("api", 15, "critique"),  # 4 x 3 = 12
+        ("auth", 3, "moyenne"),  # 3 x 1 = 3
+        ("auth", 7, "elevee"),  # 3 x 2 = 6
+        ("auth", 15, "critique"),  # 3 x 3 = 9
+        ("front", 3, "faible"),  # 2 x 1 = 2
+        ("front", 7, "moyenne"),  # 2 x 2 = 4
+        ("front", 15, "elevee"),  # 2 x 3 = 6
+        ("api", 5.99, "moyenne"),  # frontière : < 6 -> niveau 1
+        ("api", 6, "elevee"),  # >= 6 -> niveau 2
+        ("api", 11.99, "elevee"),
+        ("api", 12, "critique"),  # >= 12 -> niveau 3
+    ],
+)
 def test_gravite(service, intensite, attendu):
     assert gravite(service, intensite) == attendu
 
@@ -146,8 +153,9 @@ def test_gravite_service_inconnu():
 
 # --- IncidentTracker -------------------------------------------------------------
 
+
 def rejouer(tracker, lignes):
-    return [e for e in (tracker.mettre_a_jour(l) for l in lignes) if e]
+    return [e for e in (tracker.mettre_a_jour(ligne) for ligne in lignes) if e]
 
 
 def test_pas_d_alerte_avant_n_photos_anormales(det, ligne_normale, ligne_anormale):
@@ -180,8 +188,14 @@ def test_pic_isole_ne_declenche_rien(det, ligne_normale, ligne_anormale):
 
 def test_n_photos_anormales_non_consecutives_ne_declenchent_pas(det, ligne_normale, ligne_anormale):
     t = IncidentTracker(det, n_consecutifs=3)
-    lignes = [ligne_anormale(0), ligne_anormale(10), ligne_normale(20), ligne_anormale(30),
-              ligne_anormale(40), ligne_normale(50)]
+    lignes = [
+        ligne_anormale(0),
+        ligne_anormale(10),
+        ligne_normale(20),
+        ligne_anormale(30),
+        ligne_anormale(40),
+        ligne_normale(50),
+    ]
     assert rejouer(t, lignes) == []
 
 
@@ -208,8 +222,11 @@ def test_fin_apres_n_photos_normales_d_affilee(det, ligne_normale, ligne_anormal
 
 def test_nouvel_incident_apres_la_fin(det, ligne_normale, ligne_anormale):
     t = IncidentTracker(det, n_consecutifs=3)
-    lignes = ([ligne_anormale(i * 10) for i in range(3)] + [ligne_normale(100 + i * 10) for i in range(3)]
-              + [ligne_anormale(200 + i * 10, "api") for i in range(3)])
+    lignes = (
+        [ligne_anormale(i * 10) for i in range(3)]
+        + [ligne_normale(100 + i * 10) for i in range(3)]
+        + [ligne_anormale(200 + i * 10, "api") for i in range(3)]
+    )
     evs = rejouer(t, lignes)
     assert [e["evenement"] for e in evs] == ["incident_debut", "incident_fin", "incident_debut"]
     assert evs[2]["service"] == "api"
@@ -221,6 +238,7 @@ def test_n_consecutifs_configurable(det, ligne_anormale):
 
 
 # --- Sauvegarde / chargement ------------------------------------------------------
+
 
 def test_save_load_aller_retour(det, normal, tmp_path):
     chemin = tmp_path / "detecteur.joblib"
@@ -239,6 +257,7 @@ def test_save_ecrit_la_fiche_json(det, tmp_path):
     assert fiche_chemin.exists()
     fiche = json.loads(fiche_chemin.read_text(encoding="utf-8"))
     import sklearn
+
     assert fiche["type_modele"] == "isolation_forest"
     assert fiche["nb_photos_entrainement"] == 300
     assert fiche["version_sklearn"] == sklearn.__version__
@@ -253,6 +272,7 @@ def test_save_ecrit_la_fiche_json(det, tmp_path):
 
 def test_load_avertit_si_version_sklearn_differente(det, tmp_path):
     import joblib
+
     chemin = tmp_path / "m.joblib"
     joblib.dump({"detecteur": det, "sklearn": "0.0.1"}, chemin)
     with warnings.catch_warnings(record=True) as w:
@@ -264,6 +284,7 @@ def test_load_avertit_si_version_sklearn_differente(det, tmp_path):
 def test_chaine_complete_avec_la_simulation():
     """Logs bruts simulés -> features -> détecteur -> incident désigné sur le bon service."""
     from app.infrastructure.sources.simulation import SimulationSource
+
     t0 = 1_700_000_000 // 10 * 10
     d = AnomalyDetector().fit(SimulationSource(seed=1).fetch(t0, t0 + 1800))
     incident = {"service": "auth", "debut_s": 600, "duree_s": 300, "type": "brute_force"}

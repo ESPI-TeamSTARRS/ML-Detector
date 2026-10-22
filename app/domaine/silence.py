@@ -13,6 +13,7 @@ DetecteurAvecSilence enveloppe un AnomalyDetector sans le modifier : mêmes colo
 le moteur et le contrat d'alerte restent identiques (la règle de N photos d'affilée s'applique aussi au silence).
 Interrupteur : config.SILENCE_ACTIF.
 """
+
 import pandas as pd
 
 import config
@@ -35,6 +36,8 @@ class RegleSilence:
     def services_silencieux(self, photos: pd.DataFrame, detecteur: AnomalyDetector) -> pd.DataFrame:
         """Booléens (une colonne par service concerné) : True = muet alors qu'il parle d'habitude."""
         silencieux = {}
+        if detecteur.moyenne is None:
+            return pd.DataFrame(index=photos.index)
         for service in detecteur.features_par_service:
             colonne = f"{service}__req_count"
             if colonne not in detecteur.moyenne.index or colonne not in photos.columns:
@@ -82,7 +85,7 @@ class DetecteurAvecSilence:
 
     def _est_muet(self, lignes: pd.DataFrame, service: str) -> bool:
         silencieux = self._regle.services_silencieux(lignes, self._detecteur)
-        return service in silencieux.columns and silencieux[service].sum() * 2 > len(lignes)
+        return service in silencieux.columns and bool(silencieux[service].sum() * 2 > len(lignes))
 
     @staticmethod
     def _criticite(service: str) -> int:

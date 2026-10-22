@@ -4,6 +4,7 @@ Outils partagés par les tests du domaine.
 On construit ici de petits jeux de données DÉTERMINISTES (graine fixe) : un test qui
 change de résultat d'un jour à l'autre est inutilisable devant un jury.
 """
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -14,8 +15,8 @@ T0 = 1_700_000_000 // 10 * 10  # un début de fenêtre de 10 s (multiple de 10)
 
 
 SERVICES_TEST = {
-    "api":   {"criticite": 4, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
-    "auth":  {"criticite": 3, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
+    "api": {"criticite": 4, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
+    "auth": {"criticite": 3, "features": ["req_count", "error_4xx", "error_5xx", "latency_avg_ms"]},
     "front": {"criticite": 2, "features": ["req_count", "error_5xx"]},
 }
 
@@ -41,11 +42,16 @@ def services_mini(monkeypatch):
     Remplace config.SERVICES par 2 petits services pour que les valeurs attendues
     des tests de features soient calculables à la main.
     """
-    monkeypatch.setattr("config.SERVICES", {
-        "a": {"criticite": 4, "features": ["req_count", "error_4xx", "error_5xx",
-                                           "error_logs", "latency_avg_ms", "latency_p95_ms"]},
-        "b": {"criticite": 1, "features": ["req_count"]},
-    })
+    monkeypatch.setattr(
+        "config.SERVICES",
+        {
+            "a": {
+                "criticite": 4,
+                "features": ["req_count", "error_4xx", "error_5xx", "error_logs", "latency_avg_ms", "latency_p95_ms"],
+            },
+            "b": {"criticite": 1, "features": ["req_count"]},
+        },
+    )
     return config.SERVICES
 
 
@@ -77,16 +83,19 @@ def ligne_normale(normal):
 
     def fabrique(ts: int) -> pd.DataFrame:
         return pd.DataFrame([mediane.values], columns=normal.columns, index=pd.Index([ts], name="timestamp"))
+
     return fabrique
 
 
 @pytest.fixture
 def ligne_anormale(ligne_normale):
     """Fabrique une photo où SEUL le service `service` dérive (4xx x100, latence x5)."""
+
     def fabrique(ts: int, service: str = "auth") -> pd.DataFrame:
         ligne = ligne_normale(ts)
         ligne[f"{service}__error_4xx"] = 60.0
         if f"{service}__latency_avg_ms" in ligne.columns:
             ligne[f"{service}__latency_avg_ms"] = 600.0
         return ligne
+
     return fabrique

@@ -4,6 +4,7 @@ SERVICE HTTP : Lance la boucle temps réel et expose les routes FastAPI.
 Lancement :
   uvicorn app.presentation.api.main:app --host 0.0.0.0 --port 8000
 """
+
 import logging
 import os
 import threading
@@ -13,15 +14,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import config
-from app.domaine.detecteur import AnomalyDetector
-from app.domaine.silence import avec_silence
 from app.application.alerter import NotificateurRemediation
 from app.application.contexte_llm import NotificateurRAG
 from app.application.detecter import Moteur
-from app.infrastructure.sources.simulation import SimulationSource
+from app.domaine.detecteur import AnomalyDetector
+from app.domaine.silence import avec_silence
+from app.infrastructure.sources.base import Source
 from app.infrastructure.sources.loki import LokiSource
 from app.infrastructure.sources.push import PushSource
-from app.presentation.api.routes import health, etat, metrics, simulation, ingest
+from app.infrastructure.sources.simulation import SimulationSource
+from app.presentation.api.routes import etat, health, ingest, metrics, simulation
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("ml-detector")
@@ -32,7 +34,9 @@ def charger_detecteur(source_simulee: bool) -> AnomalyDetector:
     if os.path.exists(config.MODEL_PATH):
         return AnomalyDetector.load(config.MODEL_PATH)
     if not source_simulee:
-        raise RuntimeError(f"Modèle introuvable : {config.MODEL_PATH}. Lancer d'abord : python -m app.presentation.cli.train")
+        raise RuntimeError(
+            f"Modèle introuvable : {config.MODEL_PATH}. Lancer d'abord : python -m app.presentation.cli.train"
+        )
     # Confort dev : entraînement automatique sur données simulées
     log.warning("Pas de modèle : entraînement automatique sur données simulées (mode dev)")
     fin = time.time()
@@ -44,6 +48,7 @@ def charger_detecteur(source_simulee: bool) -> AnomalyDetector:
 def construire_moteur() -> Moteur:
     """Fabrique le moteur avec la bonne source."""
     simule = config.SOURCE == "simule"
+    source: Source
     if simule:
         source = SimulationSource(origine=time.time())
         retard = 0
@@ -60,8 +65,11 @@ def construire_moteur() -> Moteur:
         detecteur=avec_silence(charger_detecteur(simule)),
         source=source,
         notificateur=NotificateurRemediation(config.REMEDIATION_URL, config.lire_secret("ALERT_TOKEN")),
-        notificateur_rag=(NotificateurRAG(config.RAG_URL, config.lire_secret("RAG_TOKEN"), config.RAG_TIMEOUT_S)
-                          if config.RAG_URL else None),
+        notificateur_rag=(
+            NotificateurRAG(config.RAG_URL, config.lire_secret("RAG_TOKEN"), config.RAG_TIMEOUT_S)
+            if config.RAG_URL
+            else None
+        ),
         rag_fenetre_s=config.RAG_FENETRE_S,
         rag_max_logs=config.RAG_MAX_LOGS,
         pas=config.STEP_SECONDS,

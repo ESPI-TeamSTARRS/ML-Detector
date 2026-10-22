@@ -4,6 +4,7 @@ COLLECT : produit un CSV de features (une ligne par photo de STEP_SECONDS second
 Toutes les sources donnent des logs bruts ; les features sont calculées au même endroit,
 donc le CSV a exactement le même format quelle que soit la source.
 """
+
 import argparse
 import sys
 import time
@@ -19,7 +20,8 @@ from app.infrastructure.sources.simulation import SimulationSource
 EXEMPLES = """exemples (PowerShell, depuis le dossier ml-detector) :
   python -m app.presentation.cli.collect --source loki --minutes 60 --out data/normal.csv
   python -m app.presentation.cli.collect --source simule --minutes 60 --out data/normal_simule.csv
-  python -m app.presentation.cli.collect --source simule --minutes 20 --out data/incident_simule.csv --incident api:10:5:dos
+  python -m app.presentation.cli.collect --source simule --minutes 20 --out data/incident_simule.csv \
+      --incident api:10:5:dos
   python -m app.presentation.cli.collect --source fichier --fichier data/logs.jsonl --out data/normal.csv
 """
 
@@ -32,8 +34,10 @@ def lire_incident(texte: str) -> dict:
     service, debut_min, duree_min, type_ = morceaux
     try:
         debut_s, duree_s = int(float(debut_min) * 60), int(float(duree_min) * 60)
-    except ValueError:
-        raise ErreurDonnees(f"Incident invalide '{texte}' : début et durée doivent être des nombres de minutes")
+    except ValueError as err:
+        raise ErreurDonnees(
+            f"Incident invalide '{texte}' : début et durée doivent être des nombres de minutes"
+        ) from err
     if service not in config.SERVICES:
         raise ErreurDonnees(f"Incident invalide '{texte}' : service inconnu (connus : {', '.join(config.SERVICES)})")
     if type_ not in ("dos", "panne", "brute_force"):
@@ -72,7 +76,7 @@ def collecter(args) -> pd.DataFrame:
             fin = dernier + 1  # +1 : [debut, fin) est ouvert à droite, on veut le dernier log inclus
             debut = premier if args.minutes is None else max(premier, fin - args.minutes * 60)
         except (FileNotFoundError, ValueError) as e:
-            raise ErreurDonnees(f"Lecture de {args.fichier} impossible : {e}")
+            raise ErreurDonnees(f"Lecture de {args.fichier} impossible : {e}") from e
         return source.fetch(aligner(debut), fin)
 
     minutes = 60 if args.minutes is None else args.minutes
@@ -83,29 +87,39 @@ def collecter(args) -> pd.DataFrame:
         try:
             return LokiSource().fetch(debut, fin)
         except Exception as e:  # réseau, Loki arrêté, requête refusée...
-            raise ErreurDonnees(f"Loki injoignable ou en erreur ({config.LOKI_URL}) : {e}")
+            raise ErreurDonnees(f"Loki injoignable ou en erreur ({config.LOKI_URL}) : {e}") from e
 
     # Simulation : origine FIXE = début de la fenêtre, donc "api:10:5:dos" tombe vraiment à +10 min.
     incidents = [lire_incident(t) for t in args.incident]
     fin = aligner(time.time())
     debut = aligner(fin - minutes * 60)
-    source = SimulationSource(incidents=incidents, seed=args.seed, pas=pas, origine=debut)
-    return ajouter_verite(source.fetch(debut, fin), incidents, debut)
+    simulation = SimulationSource(incidents=incidents, seed=args.seed, pas=pas, origine=debut)
+    return ajouter_verite(simulation.fetch(debut, fin), incidents, debut)
 
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         description="Collecte des logs et écrit un CSV de features (une ligne par photo de 10 s).",
-        epilog=EXEMPLES, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--source", choices=["loki", "fichier", "simule"], required=True,
-                   help="d'où viennent les logs")
+        epilog=EXEMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--source", choices=["loki", "fichier", "simule"], required=True, help="d'où viennent les logs")
     p.add_argument("--out", required=True, help="CSV de sortie")
-    p.add_argument("--minutes", type=float, default=None,
-                   help="durée de la fenêtre, finissant maintenant (loki, simule ; défaut 60). "
-                        "Pour fichier : les N dernières minutes du fichier (défaut : tout le fichier)")
+    p.add_argument(
+        "--minutes",
+        type=float,
+        default=None,
+        help="durée de la fenêtre, finissant maintenant (loki, simule ; défaut 60). "
+        "Pour fichier : les N dernières minutes du fichier (défaut : tout le fichier)",
+    )
     p.add_argument("--fichier", help="(fichier) export de logs .jsonl, .ndjson ou .csv")
-    p.add_argument("--incident", action="append", default=[], metavar="SERVICE:DEBUT_MIN:DUREE_MIN:TYPE",
-                   help="(simule) incident à injecter, répétable. Types : dos, panne, brute_force")
+    p.add_argument(
+        "--incident",
+        action="append",
+        default=[],
+        metavar="SERVICE:DEBUT_MIN:DUREE_MIN:TYPE",
+        help="(simule) incident à injecter, répétable. Types : dos, panne, brute_force",
+    )
     p.add_argument("--seed", type=int, default=42, help="(simule) graine du hasard, pour reproduire")
     args = p.parse_args(argv)
 
@@ -116,6 +130,7 @@ def main(argv=None) -> int:
         if df.empty:
             raise ErreurDonnees("Aucune photo produite : pas de logs sur cette période ?")
         from pathlib import Path
+
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(args.out)
     except ErreurDonnees as e:

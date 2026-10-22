@@ -43,6 +43,58 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
+## Développement (uv + Poe)
+
+Alternative à l'installation ci-dessus : [uv](https://docs.astral.sh/uv/), avec Python 3.12 épinglé dans `.python-version`.
+
+```powershell
+uv run poe serve-sim   # serveur en mode simulé, http://localhost:8000/health
+uv run poe quality     # lint (ruff), formatage (ruff format --check) et types (mypy) : bloquants en CI
+uv run poe security    # audit des dépendances (pip-audit) : échoue dès une vulnérabilité connue
+uv run poe test        # tests et couverture (seuil 80 %)
+uv run poe check       # qualité, audit puis tests
+uv run poe format      # corrige le formatage
+uv run jupyter lab     # notebooks d'analyse (notebooks/)
+```
+
+`requirements.txt` (utilisé par le Dockerfile) est **généré** depuis `uv.lock` : ne pas le modifier à la main. Pour changer
+une dépendance : `uv add <paquet>==<version>`, puis `uv run poe requirements`. Les versions de scikit-learn, numpy, pandas et
+joblib restent figées : elles conditionnent le chargement du modèle entraîné.
+
+### Hooks Git
+
+Trois hooks vérifient, sans jamais corriger les fichiers ni se contourner (`--no-verify` interdit). Installation, une fois :
+
+```powershell
+uv run pre-commit install --install-hooks
+```
+
+| Hook | Contrôles |
+|---|---|
+| `commit-msg` | message au format Conventional Commit : `<type>(<portée>)?: <description>` (types : feat, fix, docs, chore, refactor, test, ci, build, perf, style, revert) |
+| `pre-commit` | gitleaks sur l'index, puis lint et formatage |
+| `pre-push` | gitleaks sur les commits poussés (même plage que la CI), puis types et tests sans couverture (environ 1 minute) |
+
+Les hooks `pre-commit` et `pre-push` demandent le binaire `gitleaks` sur le PATH, en version 8.30.1 (la même que la CI) :
+`winget install gitleaks.gitleaks` (ou voir [gitleaks](https://github.com/gitleaks/gitleaks#installing)).
+
+### Intégration continue
+
+`.github/workflows/ci.yml` tourne sur chaque PR vers `main` et à chaque push sur `main`. Il rejoue les tâches des hooks :
+
+| Job | Contenu |
+|---|---|
+| `python` | installation figée (`uv sync`, Python 3.12, roues uniquement), `requirements.txt` à jour avec `uv.lock`, `poe quality`, `poe test` (couverture ≥ 80 %), `poe security` |
+| `secrets-scan` | gitleaks (v8.30.1, archive vérifiée par son SHA-256) sur les seuls commits apportés par la PR ou le push |
+| `pr-title` | le titre de la PR respecte Conventional Commits (même script que le hook `commit-msg`) |
+| `docker` | construction de l'image, démarrage avec les réglages de durcissement du compose (lecture seule, aucune capacité, no-new-privileges) jusqu'à « healthy », puis scan Trivy bloquant (HIGH et CRITICAL corrigeables, secrets) |
+| `ci-ok` | job final, **seul check à rendre obligatoire** dans la protection de la branche `main` |
+
+Une exception Trivy se déclare dans `.trivyignore`, avec motif, auteur et date de réévaluation. Pour rejouer en local :
+`uv run poe check`. Les actions GitHub sont épinglées par SHA complet.
+
+Documentation détaillée : [runbook CI](docs/ci.md), [publier un changement](docs/publier.md), [retour arrière](docs/retour-arriere.md).
+
 ## Utilisation
 
 ```powershell

@@ -1,0 +1,6 @@
+# Exceptions du scan Trivy de l'image (voir le job `docker` de .github/workflows/ci.yml).
+# Une ligne = un identifiant (CVE-AAAA-NNNN ou GHSA-xxxx). Chaque exception DOIT être précédée
+# d'un commentaire : motif, auteur et date de réévaluation (3 mois maximum).
+# Exemple :
+#   # Non exploitable : bibliothèque présente mais jamais appelée. Sam, à revoir le 2027-01-20.
+#   CVE-2099-0001

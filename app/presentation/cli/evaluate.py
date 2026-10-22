@@ -9,14 +9,14 @@ Adaptation par rapport à app/domaine/evaluation.py : evaluer() n'y regarde que 
 incident et ne donne pas les pourcentages de photos. Le calcul est donc fait ici, pour
 plusieurs incidents, avec les mêmes briques (AnomalyDetector, IncidentTracker).
 """
+
 import argparse
 import sys
 
 import pandas as pd
 
 import config
-from app.application.entrainer import (ErreurDonnees, charger_csv, charger_pour_entrainement,
-                                       parametres_modele)
+from app.application.entrainer import ErreurDonnees, charger_csv, charger_pour_entrainement, parametres_modele
 from app.domaine.detecteur import AnomalyDetector, IncidentTracker
 
 MODELES = ["isolation_forest", "lof", "statistique"]
@@ -38,8 +38,8 @@ def lire_instant(texte: str) -> int:
         pass
     try:
         t = pd.Timestamp(texte)
-    except ValueError:
-        raise ErreurDonnees(f"Date illisible : '{texte}' (attendu : secondes epoch ou ISO 8601)")
+    except ValueError as err:
+        raise ErreurDonnees(f"Date illisible : '{texte}' (attendu : secondes epoch ou ISO 8601)") from err
     t = t.tz_localize("UTC") if t.tzinfo is None else t
     return int(t.timestamp())
 
@@ -95,7 +95,7 @@ def evaluer_modele(det: AnomalyDetector, df: pd.DataFrame, n_consecutifs: int) -
     #    compte comme détection, les suivantes (et celles hors incident) sont des fausses alertes.
     delais, bons_services, detectes = [], 0, 0
     utilisees = set()
-    for k, inc in enumerate(reels):
+    for inc in reels:
         dedans = [e for e in debuts if inc["debut"] <= e["timestamp"] <= inc["fin"]]
         if dedans:
             e = dedans[0]
@@ -114,20 +114,31 @@ def evaluer_modele(det: AnomalyDetector, df: pd.DataFrame, n_consecutifs: int) -
         "delai_moyen_s": round(sum(delais) / len(delais), 1) if delais else None,
         "bon_service": bons_services,
         "fausses_alertes": fausses,
-        "pct_photos_attaque_signalees": round(100 * float(anomalie[en_attaque].mean()), 1) if en_attaque.any() else None,
-        "pct_photos_normales_signalees": round(100 * float(anomalie[~en_attaque].mean()), 1) if (~en_attaque).any() else None,
+        "pct_photos_attaque_signalees": round(100 * float(anomalie[en_attaque].mean()), 1)
+        if en_attaque.any()
+        else None,
+        "pct_photos_normales_signalees": round(100 * float(anomalie[~en_attaque].mean()), 1)
+        if (~en_attaque).any()
+        else None,
     }
 
 
 def afficher(tableau: pd.DataFrame) -> None:
-    f = lambda v, suffixe="": "-" if pd.isna(v) else f"{v}{suffixe}"
-    print(f"\n{'modèle':<18}{'détectés':>10}{'délai moy.':>12}{'bon service':>13}"
-          f"{'fausses al.':>13}{'% attaque':>11}{'% normal':>10}")
+
+    def f(v, suffixe=""):
+        return "-" if pd.isna(v) else f"{v}{suffixe}"
+
+    print(
+        f"\n{'modèle':<18}{'détectés':>10}{'délai moy.':>12}{'bon service':>13}"
+        f"{'fausses al.':>13}{'% attaque':>11}{'% normal':>10}"
+    )
     for _, r in tableau.iterrows():
-        print(f"{r['modele']:<18}{r['incidents_detectes']:>5}/{r['incidents_reels']:<4}"
-              f"{f(r['delai_moyen_s'], ' s'):>12}{r['bon_service']:>8}/{r['incidents_detectes']:<4}"
-              f"{r['fausses_alertes']:>13}{f(r['pct_photos_attaque_signalees'], ' %'):>11}"
-              f"{f(r['pct_photos_normales_signalees'], ' %'):>10}")
+        print(
+            f"{r['modele']:<18}{r['incidents_detectes']:>5}/{r['incidents_reels']:<4}"
+            f"{f(r['delai_moyen_s'], ' s'):>12}{r['bon_service']:>8}/{r['incidents_detectes']:<4}"
+            f"{r['fausses_alertes']:>13}{f(r['pct_photos_attaque_signalees'], ' %'):>11}"
+            f"{f(r['pct_photos_normales_signalees'], ' %'):>10}"
+        )
     print("\n% attaque = photos d'incident signalées anormales (plus haut = mieux)")
     print("% normal  = photos normales faussement signalées (plus bas = mieux)")
 
@@ -135,17 +146,30 @@ def afficher(tableau: pd.DataFrame) -> None:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         description="Compare les trois modèles sur un jeu avec incidents.",
-        epilog=EXEMPLES, formatter_class=argparse.RawDescriptionHelpFormatter)
+        epilog=EXEMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--normal", required=True, help="CSV de trafic normal (entraînement)")
-    p.add_argument("--incident-data", required=True, dest="incident_data",
-                   help="CSV avec incidents (colonne _verite, ou voir --incident)")
-    p.add_argument("--incident", action="append", default=[], metavar="SERVICE,DEBUT,FIN",
-                   help="pour un CSV réel SANS _verite : incident réel, répétable. "
-                        "DEBUT et FIN en secondes epoch ou ISO 8601")
-    p.add_argument("--contamination", type=float, default=None,
-                   help="contamination des modèles (défaut : config.py)")
-    p.add_argument("--n", type=int, default=config.N_CONSECUTIFS,
-                   help="photos anormales d'affilée avant alerte (défaut : %(default)s)")
+    p.add_argument(
+        "--incident-data",
+        required=True,
+        dest="incident_data",
+        help="CSV avec incidents (colonne _verite, ou voir --incident)",
+    )
+    p.add_argument(
+        "--incident",
+        action="append",
+        default=[],
+        metavar="SERVICE,DEBUT,FIN",
+        help="pour un CSV réel SANS _verite : incident réel, répétable. DEBUT et FIN en secondes epoch ou ISO 8601",
+    )
+    p.add_argument("--contamination", type=float, default=None, help="contamination des modèles (défaut : config.py)")
+    p.add_argument(
+        "--n",
+        type=int,
+        default=config.N_CONSECUTIFS,
+        help="photos anormales d'affilée avant alerte (défaut : %(default)s)",
+    )
     p.add_argument("--csv-sortie", help="écrit le tableau dans ce CSV (chiffres du dossier)")
     args = p.parse_args(argv)
 
@@ -155,8 +179,10 @@ def main(argv=None) -> int:
         if args.incident:
             test = ajouter_verite(test, args.incident)
         elif "_verite" not in test.columns:
-            raise ErreurDonnees("Pas de colonne _verite dans le CSV d'incident : "
-                                'indiquer l\'incident avec --incident "service,debut,fin"')
+            raise ErreurDonnees(
+                "Pas de colonne _verite dans le CSV d'incident : "
+                'indiquer l\'incident avec --incident "service,debut,fin"'
+            )
         if not (test["_verite"].fillna("") != "").any():
             raise ErreurDonnees("Le CSV d'incident ne contient aucune photo d'incident (_verite vide).")
 
@@ -177,6 +203,7 @@ def main(argv=None) -> int:
     afficher(tableau)
     if args.csv_sortie:
         from pathlib import Path
+
         Path(args.csv_sortie).parent.mkdir(parents=True, exist_ok=True)
         tableau.to_csv(args.csv_sortie, index=False)
         print(f"\nTableau écrit -> {args.csv_sortie}")

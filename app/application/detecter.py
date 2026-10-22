@@ -6,6 +6,7 @@ MOTEUR : boucle temps réel qui orchestre la détection.
   2. Passe au détecteur + IncidentTracker
   3. Si événement (début/fin d'incident) : journalise + notifie remédiation
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ import threading
 import time
 import uuid
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.application.contexte_llm import construire_message
 from app.domaine.detecteur import AnomalyDetector, IncidentTracker
@@ -29,10 +30,20 @@ HISTORIQUE_FENETRES = 6  # fenêtres lues par cycle (seule la dernière est anal
 class Moteur:
     """Boucle temps réel du détecteur."""
 
-    def __init__(self, detecteur: AnomalyDetector, source: Source, notificateur=None,
-                 pas: int = 10, retard: int = 0, n_consecutifs: int = 3, horloge=time.time,
-                 notificateur_rag=None, rag_fenetre_s: int = 60, rag_max_logs: int = 200,
-                 rag_asynchrone: bool = True):
+    def __init__(
+        self,
+        detecteur: AnomalyDetector,
+        source: Source,
+        notificateur=None,
+        pas: int = 10,
+        retard: int = 0,
+        n_consecutifs: int = 3,
+        horloge=time.time,
+        notificateur_rag=None,
+        rag_fenetre_s: int = 60,
+        rag_max_logs: int = 200,
+        rag_asynchrone: bool = True,
+    ):
         self.detecteur = detecteur
         self.source = source
         self.notificateur = notificateur
@@ -47,12 +58,18 @@ class Moteur:
         self.tracker = IncidentTracker(detecteur, n_consecutifs=n_consecutifs)
 
         self._verrou = threading.Lock()
-        self.evenements = deque(maxlen=50)
-        self.compteurs = {"cycles": 0, "erreurs_source": 0, "alertes_envoyees": 0, "alertes_echouees": 0,
-                         "contexte_llm_envoyes": 0, "contexte_llm_echoues": 0}
-        self.dernier_ts = None
-        self.derniere_maj = None
-        self.derniere_erreur = None
+        self.evenements: deque[dict] = deque(maxlen=50)
+        self.compteurs: dict[str, int] = {
+            "cycles": 0,
+            "erreurs_source": 0,
+            "alertes_envoyees": 0,
+            "alertes_echouees": 0,
+            "contexte_llm_envoyes": 0,
+            "contexte_llm_echoues": 0,
+        }
+        self.dernier_ts: int | None = None
+        self.derniere_maj: float | None = None
+        self.derniere_erreur: str | None = None
 
     def cycle(self, maintenant: float | None = None) -> dict | None:
         """Un tour de boucle. Retourne l'événement produit, ou None."""
@@ -89,7 +106,7 @@ class Moteur:
             evenement = {
                 "id": str(uuid.uuid4()),
                 "detecteur": "ml-detector",
-                "horodatage": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
+                "horodatage": datetime.fromtimestamp(ts, UTC).isoformat(),
                 **evenement,
             }
             log.warning("EVENEMENT %s", json.dumps(evenement, ensure_ascii=False))
@@ -147,10 +164,11 @@ class Moteur:
         """État courant pour /etat, /health, /metrics."""
         with self._verrou:
             res = self.tracker.dernier_resultat
-            scores = {} if res is None else {
-                k.removeprefix("score_"): round(float(v), 4)
-                for k, v in res.items() if k.startswith("score_")
-            }
+            scores: dict[str, float] = (
+                {}
+                if res is None
+                else {k.removeprefix("score_"): round(float(v), 4) for k, v in res.items() if k.startswith("score_")}
+            )
             return {
                 "en_incident": self.tracker.en_incident,
                 "service_touche": self.tracker.service if self.tracker.en_incident else None,

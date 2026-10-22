@@ -1,6 +1,7 @@
 """Route /metrics : métriques Prometheus."""
-from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, generate_latest
+
 from fastapi import Response
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, generate_latest
 
 import config
 
@@ -24,8 +25,9 @@ def creer_routes_metrics(app):
             incident.labels(service=service).set(1 if etat["service_touche"] == service else 0)
 
         # Dernière mise à jour
-        Gauge("detector_derniere_maj_timestamp", "Heure du dernier cycle réussi",
-              registry=registre).set(etat["derniere_maj"] or 0)
+        Gauge("detector_derniere_maj_timestamp", "Heure du dernier cycle réussi", registry=registre).set(
+            etat["derniere_maj"] or 0
+        )
 
         # Compteurs
         for nom, valeur in etat["compteurs"].items():
