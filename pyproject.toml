@@ -4,19 +4,19 @@ version = "0.1.0"
 description = "Détecteur d'anomalies Resilience-Alpha (pilier IA/ML)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi==0.115.12",
+    "fastapi==0.159.1",
     "joblib==1.4.2",
     "numpy==2.2.6",
     "pandas==2.2.3",
-    "prometheus-client==0.21.1",
-    "python-dotenv==1.1.0",
-    "requests==2.32.3",
+    "prometheus-client==0.26.0",
+    "python-dotenv==1.2.4",
+    "requests==2.34.2",
     "scikit-learn==1.6.1",
-    "uvicorn[standard]==0.34.2",
+    "uvicorn[standard]==0.54.0",
 ]
 
 # Outillage de dev uniquement : pas de package à construire.
-# L'image Docker continue d'installer requirements.txt.
+# L'image Docker installe requirements.txt, GÉNÉRÉ depuis uv.lock (uv run poe requirements) : mêmes versions que la CI.
 [tool.uv]
 package = false
 
@@ -95,3 +95,7 @@ sequence = ["lint", "format:check", "typecheck"]
 [tool.poe.tasks.check]
 help = "Qualité, audit des dépendances puis tests (ce que la CI exécute)"
 sequence = ["quality", "security", "test"]
+
+[tool.poe.tasks.requirements]
+help = "Régénère requirements.txt (utilisé par le Dockerfile) depuis uv.lock : versions exactes, sans les outils de dev"
+cmd = "uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements.txt"

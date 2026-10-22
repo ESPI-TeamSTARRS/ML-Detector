@@ -57,8 +57,9 @@ uv run poe format      # corrige le formatage
 uv run jupyter lab     # notebooks d'analyse (notebooks/)
 ```
 
-Les versions des dépendances sont fixées à deux endroits : `requirements.txt` (utilisé par le Dockerfile) et
-`pyproject.toml` (développement, `uv.lock`). Les modifier **ensemble**.
+`requirements.txt` (utilisé par le Dockerfile) est **généré** depuis `uv.lock` : ne pas le modifier à la main. Pour changer
+une dépendance : `uv add <paquet>==<version>`, puis `uv run poe requirements`. Les versions de scikit-learn, numpy, pandas et
+joblib restent figées : elles conditionnent le chargement du modèle entraîné.
 
 ## Utilisation
 
