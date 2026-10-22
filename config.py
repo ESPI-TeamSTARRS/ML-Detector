@@ -71,7 +71,9 @@ SERVICES = {
 # type : "isolation_forest" (principal), "lof" ou "statistique" (comparaison)
 MODELE = {
     "type": "isolation_forest",
-    "params": {"contamination": 0.01, "n_estimators": 200, "random_state": 42},
+    # contamination 0.03 : mesuré sur 2 h de trafic (voir BENCHMARK.md). À 0.01, un flood n'est pas détecté ;
+    # de 0.02 à 0.05, tous les incidents testés le sont en 20 s sans fausse alerte ; à 0.10, fausses alertes.
+    "params": {"contamination": 0.03, "n_estimators": 200, "random_state": 42},
 }
 MODEL_PATH = os.getenv("MODEL_PATH", "models/detecteur.joblib")
 
