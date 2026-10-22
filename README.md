@@ -93,6 +93,8 @@ Les hooks `pre-commit` et `pre-push` demandent le binaire `gitleaks` sur le PATH
 Une exception Trivy se déclare dans `.trivyignore`, avec motif, auteur et date de réévaluation. Pour rejouer en local :
 `uv run poe check`. Les actions GitHub sont épinglées par SHA complet.
 
+Documentation détaillée : [runbook CI](docs/ci.md), [publier un changement](docs/publier.md), [retour arrière](docs/retour-arriere.md).
+
 ## Utilisation
 
 ```powershell
