@@ -1,8 +1,8 @@
 """Tests de app/domaine/schema.py : normalisation des logs bruts."""
+
 import pandas as pd
 import pytest
 
-import config
 from app.domaine.schema import normaliser
 
 COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms", "outcome"]
@@ -16,25 +16,31 @@ def un_log(**champs) -> dict:
     return base
 
 
-@pytest.mark.parametrize("valeur", [
-    "2026-10-20T09:15:20Z",
-    "2026-10-20T09:15:20.000Z",
-    "2026-10-20T09:15:20+00:00",
-    "2026-10-20T11:15:20+02:00",   # même instant, autre fuseau
-    "2026-10-20T09:15:20",         # sans fuseau : on suppose UTC (pas l'heure locale du PC)
-])
+@pytest.mark.parametrize(
+    "valeur",
+    [
+        "2026-10-20T09:15:20Z",
+        "2026-10-20T09:15:20.000Z",
+        "2026-10-20T09:15:20+00:00",
+        "2026-10-20T11:15:20+02:00",  # même instant, autre fuseau
+        "2026-10-20T09:15:20",  # sans fuseau : on suppose UTC (pas l'heure locale du PC)
+    ],
+)
 def test_timestamp_iso(valeur):
     df = normaliser([un_log(timestamp=valeur)])
     assert df["timestamp"].iloc[0] == EPOCH
 
 
-@pytest.mark.parametrize("valeur", [
-    EPOCH,                  # secondes
-    int(EPOCH),
-    int(EPOCH * 1000),      # millisecondes
-    int(EPOCH * 10**9),     # nanosecondes
-    str(int(EPOCH)),        # texte (CSV)
-])
+@pytest.mark.parametrize(
+    "valeur",
+    [
+        EPOCH,  # secondes
+        int(EPOCH),
+        int(EPOCH * 1000),  # millisecondes
+        int(EPOCH * 10**9),  # nanosecondes
+        str(int(EPOCH)),  # texte (CSV)
+    ],
+)
 def test_timestamp_epoch(valeur):
     df = normaliser([un_log(timestamp=valeur)])
     assert df["timestamp"].iloc[0] == pytest.approx(EPOCH, abs=1e-3)
@@ -68,8 +74,7 @@ def test_rejet_sans_service():
 def test_rejet_sans_timestamp_ou_timestamp_illisible():
     sans_ts = un_log()
     del sans_ts["timestamp"]
-    logs = [sans_ts, un_log(timestamp="pas une date"), un_log(timestamp=None),
-            un_log(timestamp=float("nan")), un_log()]
+    logs = [sans_ts, un_log(timestamp="pas une date"), un_log(timestamp=None), un_log(timestamp=float("nan")), un_log()]
     assert normaliser(logs).shape[0] == 1
 
 
@@ -84,9 +89,16 @@ def test_log_non_dict_ignore():
 
 
 def test_correspondance_champs(monkeypatch):
-    monkeypatch.setattr("config.CORRESPONDANCE_CHAMPS", {
-        "timestamp": "ts_reel", "service": "app_reelle", "status_code": "http_code",
-        "duration_ms": "temps", "level": "niveau"})
+    monkeypatch.setattr(
+        "config.CORRESPONDANCE_CHAMPS",
+        {
+            "timestamp": "ts_reel",
+            "service": "app_reelle",
+            "status_code": "http_code",
+            "duration_ms": "temps",
+            "level": "niveau",
+        },
+    )
     brut = {"ts_reel": EPOCH, "app_reelle": "api", "http_code": 503, "temps": 30, "niveau": "error"}
     ligne = normaliser([brut]).iloc[0]
     assert ligne["service"] == "api" and ligne["status_code"] == 503
@@ -124,9 +136,11 @@ def test_champs_optionnels_absents():
 
 def test_status_et_duree_en_texte_ou_nan_deviennent_numeriques():
     # Cas d'un CSV : tout arrive en texte, les cellules vides en NaN
-    logs = [un_log(status_code="503", duration_ms="12.5"),
-            un_log(status_code="n/a", duration_ms=""),
-            un_log(status_code=float("nan"), duration_ms=None)]
+    logs = [
+        un_log(status_code="503", duration_ms="12.5"),
+        un_log(status_code="n/a", duration_ms=""),
+        un_log(status_code=float("nan"), duration_ms=None),
+    ]
     df = normaliser(logs)
     assert pd.api.types.is_numeric_dtype(df["status_code"])
     assert pd.api.types.is_numeric_dtype(df["duration_ms"])

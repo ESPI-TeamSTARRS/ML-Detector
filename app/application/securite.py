@@ -1,4 +1,5 @@
 """SÉCURITÉ : vérification des jetons (testable sans FastAPI)."""
+
 import hmac
 
 
@@ -10,4 +11,4 @@ def jeton_valide(entete: str | None, attendu: str) -> bool:
     """
     if not attendu or not entete or not entete.startswith("Bearer "):
         return False
-    return hmac.compare_digest(entete[len("Bearer "):].encode(), attendu.encode())
+    return hmac.compare_digest(entete[len("Bearer ") :].encode(), attendu.encode())

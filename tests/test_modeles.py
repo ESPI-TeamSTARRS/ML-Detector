@@ -1,9 +1,10 @@
 """Tests de app/domaine/modeles.py : les 3 modèles respectent decision_function < 0 <=> anormal."""
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from app.domaine.modeles import creer_modele, MODELES_DISPONIBLES
+from app.domaine.modeles import MODELES_DISPONIBLES, creer_modele
 
 COLS = ["s__x", "s__y"]
 TYPES = ["isolation_forest", "lof", "statistique"]
@@ -58,15 +59,18 @@ def test_taux_de_faux_positifs_faible_sur_le_normal(type_modele, X_normal):
 
 def test_statistique_detecte_la_hausse_et_la_baisse_brutale(X_normal):
     m = creer_modele("statistique", seuil_ecarts_types=3.0).fit(X_normal)
-    assert m.decision_function(photo(50 + 6 * 5, 100))[0] < 0   # +6 écarts-types
-    assert m.decision_function(photo(50 - 6 * 5, 100))[0] < 0   # -6 écarts-types (panne : trafic qui chute)
-    assert m.decision_function(photo(0, 100))[0] < 0            # plus aucune requête
-    assert m.decision_function(photo(50 + 2 * 5, 100))[0] > 0   # +2 : sous le seuil, normal
+    assert m.decision_function(photo(50 + 6 * 5, 100))[0] < 0  # +6 écarts-types
+    assert m.decision_function(photo(50 - 6 * 5, 100))[0] < 0  # -6 écarts-types (panne : trafic qui chute)
+    assert m.decision_function(photo(0, 100))[0] < 0  # plus aucune requête
+    assert m.decision_function(photo(50 + 2 * 5, 100))[0] > 0  # +2 : sous le seuil, normal
 
 
 def test_statistique_seuil_exact(X_normal):
     m = creer_modele("statistique", seuil_ecarts_types=3.0).fit(X_normal)
-    z = lambda v: (v - X_normal["s__x"].mean()) / X_normal["s__x"].std()
+
+    def z(v):
+        return (v - X_normal["s__x"].mean()) / X_normal["s__x"].std()
+
     haut = X_normal["s__x"].mean() + 3.5 * X_normal["s__x"].std()
     assert m.decision_function(photo(haut, 100))[0] == pytest.approx(3.0 - abs(z(haut)), abs=0.2)
 

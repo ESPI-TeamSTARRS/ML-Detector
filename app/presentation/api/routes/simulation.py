@@ -1,7 +1,9 @@
 """Route /simulation/incident : déclencher un incident (MODE SIMULÉ UNIQUEMENT)."""
+
+import time
+
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-import time
 
 import config
 
@@ -20,7 +22,6 @@ def creer_routes_simulation(app):
     @app.post("/simulation/incident")
     def declencher_incident(demande: IncidentSimule):
         try:
-            return app.state.moteur.source.ajouter_incident(
-                demande.service, demande.type, demande.duree_s, time.time())
+            return app.state.moteur.source.ajouter_incident(demande.service, demande.type, demande.duree_s, time.time())
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e

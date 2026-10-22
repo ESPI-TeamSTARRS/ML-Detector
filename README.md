@@ -43,6 +43,23 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
+## Développement (uv + Poe)
+
+Alternative à l'installation ci-dessus : [uv](https://docs.astral.sh/uv/), avec Python 3.12 épinglé dans `.python-version`.
+
+```powershell
+uv run poe serve-sim   # serveur en mode simulé, http://localhost:8000/health
+uv run poe quality     # lint (ruff), formatage (ruff format --check) et types (mypy) : bloquants en CI
+uv run poe security    # audit des dépendances (pip-audit) : échoue dès une vulnérabilité connue
+uv run poe test        # tests et couverture (seuil 80 %)
+uv run poe check       # qualité, audit puis tests
+uv run poe format      # corrige le formatage
+uv run jupyter lab     # notebooks d'analyse (notebooks/)
+```
+
+Les versions des dépendances sont fixées à deux endroits : `requirements.txt` (utilisé par le Dockerfile) et
+`pyproject.toml` (développement, `uv.lock`). Les modifier **ensemble**.
+
 ## Utilisation
 
 ```powershell

@@ -13,11 +13,11 @@ Chaque feature a une règle pour combler les trous (si aucun log dans la fenêtr
 Les features calculées ici sont EXACTEMENT les mêmes à l'entraînement et en direct,
 peu importe la source (Loki, push, fichier, simulation).
 """
-from typing import Callable
+
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
-
 
 # Registre global des features (nom -> fonction)
 _REGISTRE: dict[str, dict] = {}
@@ -25,9 +25,11 @@ _REGISTRE: dict[str, dict] = {}
 
 def feature(nom: str, trou: int | str):
     """Décorateur pour enregistrer une fonction comme feature."""
+
     def decorateur(func: Callable) -> Callable:
         _REGISTRE[nom] = {"fonction": func, "trou": trou}
         return func
+
     return decorateur
 
 
@@ -41,6 +43,7 @@ def _est_evenement(logs: pd.DataFrame) -> pd.Series:
 
 # --- FEATURES ---
 # Chaque fonction reçoit un DataFrame normalisé et retourne une Series (index=timestamps).
+
 
 @feature("req_count", trou=0)
 def req_count(logs: pd.DataFrame) -> pd.Series:
@@ -140,11 +143,9 @@ def construire_tableau(logs: pd.DataFrame, debut: float, fin: float, pas: int = 
 
     # Fail fast : une feature de la config inconnue du registre = faute de frappe
     # qui produirait un modèle sans cette colonne, sans jamais le dire.
-    inconnues = sorted({m for cfg in config.SERVICES.values() for m in cfg.get("features", [])
-                        if m not in _REGISTRE})
+    inconnues = sorted({m for cfg in config.SERVICES.values() for m in cfg.get("features", []) if m not in _REGISTRE})
     if inconnues:
-        raise ValueError(f"Features inconnues dans config.SERVICES : {inconnues}. "
-                         f"Disponibles : {sorted(_REGISTRE)}")
+        raise ValueError(f"Features inconnues dans config.SERVICES : {inconnues}. Disponibles : {sorted(_REGISTRE)}")
 
     df = pd.DataFrame(index=grille)
     if len(grille) == 0:

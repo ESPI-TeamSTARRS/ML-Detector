@@ -5,29 +5,37 @@ Ces logs n'ont pas de code HTTP : le résultat est dans `outcome` (success / den
 n'existe que sur certains événements, et `level` est en minuscules ("info", "warning").
 Les exemples ci-dessous reprennent ceux envoyés par DEV (valeurs fictives).
 """
+
 import json
 
 import pytest
 
-import config
 from app.domaine.features import construire_tableau
 from app.domaine.schema import normaliser
 
 T0 = 1_792_515_720  # multiple de 10, tombe dans la fenêtre du log shop ci-dessous
 
-SHOP_OK = ('{"timestamp":"2026-10-20T17:02:11.482Z","service":"basecamp-shop","level":"info",'
-           '"event":"cart.quoted","correlation_id":"7c1f0e52","outcome":"success","duration_ms":12,'
-           '"attributes":{"line_count":3,"total_cents":18970}}')
-SHOP_REFUSE = ('{"timestamp":"2026-10-20T17:02:40.019Z","service":"basecamp-shop","level":"warning",'
-               '"event":"cart.quote_rejected","correlation_id":"b3a9d7e1","outcome":"denied",'
-               '"reason":"quantity_out_of_range","attributes":{"line_count":2}}')
-PAIEMENT_REFUSE = ('{"timestamp":"2026-10-20T17:03:05.730Z","service":"basecamp-payment","level":"warning",'
-                   '"event":"payment.intent_rejected","correlation_id":"e4d2a1c8","outcome":"denied",'
-                   '"reason":"amount_exceeds_limit","actor_type":"service","actor_id":"shop",'
-                   '"resource_type":"payment_intent","attributes":{"amount_cents":2500000,"currency":"EUR"}}')
-AUTH_ECHEC = ('{"timestamp":"2026-10-20T17:04:22.208Z","service":"basecamp-auth","level":"warning",'
-              '"event":"auth.login_failed","correlation_id":"1f8b6c3d","outcome":"denied",'
-              '"reason":"invalid_credentials","attributes":{"email_hash":"9f2c1ab07d3e4c55"}}')
+SHOP_OK = (
+    '{"timestamp":"2026-10-20T17:02:11.482Z","service":"basecamp-shop","level":"info",'
+    '"event":"cart.quoted","correlation_id":"7c1f0e52","outcome":"success","duration_ms":12,'
+    '"attributes":{"line_count":3,"total_cents":18970}}'
+)
+SHOP_REFUSE = (
+    '{"timestamp":"2026-10-20T17:02:40.019Z","service":"basecamp-shop","level":"warning",'
+    '"event":"cart.quote_rejected","correlation_id":"b3a9d7e1","outcome":"denied",'
+    '"reason":"quantity_out_of_range","attributes":{"line_count":2}}'
+)
+PAIEMENT_REFUSE = (
+    '{"timestamp":"2026-10-20T17:03:05.730Z","service":"basecamp-payment","level":"warning",'
+    '"event":"payment.intent_rejected","correlation_id":"e4d2a1c8","outcome":"denied",'
+    '"reason":"amount_exceeds_limit","actor_type":"service","actor_id":"shop",'
+    '"resource_type":"payment_intent","attributes":{"amount_cents":2500000,"currency":"EUR"}}'
+)
+AUTH_ECHEC = (
+    '{"timestamp":"2026-10-20T17:04:22.208Z","service":"basecamp-auth","level":"warning",'
+    '"event":"auth.login_failed","correlation_id":"1f8b6c3d","outcome":"denied",'
+    '"reason":"invalid_credentials","attributes":{"email_hash":"9f2c1ab07d3e4c55"}}'
+)
 LOGS = [json.loads(x) for x in (SHOP_OK, SHOP_REFUSE, PAIEMENT_REFUSE, AUTH_ECHEC)]
 
 
@@ -57,9 +65,9 @@ def test_normalisation_des_quatre_exemples():
     df = normaliser(LOGS)
     assert len(df) == 4
     assert list(df["service"]) == ["basecamp-shop", "basecamp-shop", "basecamp-payment", "basecamp-auth"]
-    assert list(df["level"]) == ["INFO", "WARNING", "WARNING", "WARNING"]   # mis en majuscules
+    assert list(df["level"]) == ["INFO", "WARNING", "WARNING", "WARNING"]  # mis en majuscules
     assert list(df["outcome"]) == ["success", "denied", "denied", "denied"]
-    assert df["status_code"].isna().all()                                   # pas de code HTTP
+    assert df["status_code"].isna().all()  # pas de code HTTP
     assert df["duration_ms"].iloc[0] == 12 and df["duration_ms"].iloc[1:].isna().all()
 
 
@@ -103,7 +111,7 @@ def test_outcome_absent_ne_plante_pas():
     df = normaliser([sans])
     assert df["outcome"].iloc[0] == ""
     tab = construire_tableau(df, int(df["timestamp"].min() // 10 * 10), int(df["timestamp"].max() // 10 * 10) + 10)
-    assert tab["basecamp-shop__req_count"].sum() == 0   # ni code HTTP ni outcome : pas un événement
+    assert tab["basecamp-shop__req_count"].sum() == 0  # ni code HTTP ni outcome : pas un événement
 
 
 def test_une_ligne_nginx_sans_outcome_n_est_pas_un_evenement_applicatif():

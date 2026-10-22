@@ -3,6 +3,7 @@ ENTRAINER : charge un CSV de trafic NORMAL et entraîne le détecteur.
 
 Utilisé par app/presentation/cli/train.py (et evaluate.py pour charger les CSV).
 """
+
 from pathlib import Path
 
 import pandas as pd
@@ -36,11 +37,12 @@ def charger_csv(chemin: str) -> pd.DataFrame:
         raise ErreurDonnees(f"Fichier introuvable : {chemin}")
     try:
         df = pd.read_csv(chemin, index_col="timestamp")
-    except ValueError:
-        raise ErreurDonnees(f"{chemin} n'a pas de colonne 'timestamp' : "
-                            "est-ce bien un CSV produit par collect ?")
-    except pd.errors.EmptyDataError:
-        raise ErreurDonnees(f"{chemin} est vide.")
+    except ValueError as err:
+        raise ErreurDonnees(
+            f"{chemin} n'a pas de colonne 'timestamp' : est-ce bien un CSV produit par collect ?"
+        ) from err
+    except pd.errors.EmptyDataError as err:
+        raise ErreurDonnees(f"{chemin} est vide.") from err
     if df.empty:
         raise ErreurDonnees(f"{chemin} ne contient aucune photo.")
     return df
@@ -68,9 +70,9 @@ def parametres_modele(type_modele: str, contamination: float | None = None) -> d
     return {k: v for k, v in params.items() if k in PARAMETRES_ACCEPTES[type_modele]}
 
 
-def entrainer_et_sauvegarder(chemin_donnees: str, chemin_modele: str,
-                             type_modele: str | None = None,
-                             contamination: float | None = None) -> AnomalyDetector:
+def entrainer_et_sauvegarder(
+    chemin_donnees: str, chemin_modele: str, type_modele: str | None = None, contamination: float | None = None
+) -> AnomalyDetector:
     """Entraîne le détecteur sur un CSV de trafic normal et le sauvegarde en .joblib."""
     type_modele = type_modele or config.MODELE["type"]
     params = parametres_modele(type_modele, contamination)

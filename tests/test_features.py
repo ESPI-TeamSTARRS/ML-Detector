@@ -12,10 +12,9 @@ Jeu de logs écrit à la main (service "a", fenêtres de 10 s à partir de T=100
                  t=1038    502  FATAL  600 ms
   service "b"  : un seul log en 1000.
 """
-import pandas as pd
+
 import pytest
 
-import config
 from app.domaine import features
 from app.domaine.features import construire_tableau
 from app.domaine.schema import normaliser
@@ -29,35 +28,49 @@ def log(ts, code, level, ms, service="a"):
 
 @pytest.fixture
 def tableau(services_mini):
-    logs = normaliser([
-        log(1000.0, 200, "INFO", 100), log(1004.5, 404, "WARN", 200), log(1009.99, 503, "ERROR", 300),
-        log(1010.0, 200, "INFO", 50),
-        log(1031, 500, "ERROR", 400), log(1038, 502, "FATAL", 600),
-        log(1002, 200, "INFO", 10, service="b"),
-    ])
+    logs = normaliser(
+        [
+            log(1000.0, 200, "INFO", 100),
+            log(1004.5, 404, "WARN", 200),
+            log(1009.99, 503, "ERROR", 300),
+            log(1010.0, 200, "INFO", 50),
+            log(1031, 500, "ERROR", 400),
+            log(1038, 502, "FATAL", 600),
+            log(1002, 200, "INFO", 10, service="b"),
+        ]
+    )
     return construire_tableau(logs, T, T + 40)
 
 
 def test_forme_et_noms_de_colonnes(tableau):
     assert list(tableau.index) == [1000, 1010, 1020, 1030]
     assert list(tableau.columns) == [
-        "a__req_count", "a__error_4xx", "a__error_5xx", "a__error_logs",
-        "a__latency_avg_ms", "a__latency_p95_ms", "b__req_count"]
+        "a__req_count",
+        "a__error_4xx",
+        "a__error_5xx",
+        "a__error_logs",
+        "a__latency_avg_ms",
+        "a__latency_p95_ms",
+        "b__req_count",
+    ]
 
 
-@pytest.mark.parametrize("colonne, attendu", [
-    ("a__req_count", [3, 1, 0, 2]),
-    ("a__error_4xx", [1, 0, 0, 0]),
-    ("a__error_5xx", [1, 0, 0, 2]),
-    ("a__error_logs", [1, 0, 0, 2]),            # ERROR + FATAL comptent, WARN non
-    ("a__latency_avg_ms", [200, 50, 50, 500]),  # (100+200+300)/3 ; 50 ; précédent ; (400+600)/2
-    ("a__latency_p95_ms", [290, 50, 50, 590]),  # 200+0.9*100 ; 50 ; précédent ; 400+0.95*200
-    ("b__req_count", [1, 0, 0, 0]),
-])
+@pytest.mark.parametrize(
+    "colonne, attendu",
+    [
+        ("a__req_count", [3, 1, 0, 2]),
+        ("a__error_4xx", [1, 0, 0, 0]),
+        ("a__error_5xx", [1, 0, 0, 2]),
+        ("a__error_logs", [1, 0, 0, 2]),  # ERROR + FATAL comptent, WARN non
+        ("a__latency_avg_ms", [200, 50, 50, 500]),  # (100+200+300)/3 ; 50 ; précédent ; (400+600)/2
+        ("a__latency_p95_ms", [290, 50, 50, 590]),  # 200+0.9*100 ; 50 ; précédent ; 400+0.95*200
+        ("b__req_count", [1, 0, 0, 0]),
+    ],
+)
 def test_valeurs_de_chaque_feature(tableau, colonne, attendu):
     obtenu = tableau[colonne].tolist()
     assert len(obtenu) == len(attendu)
-    for o, a in zip(obtenu, attendu):
+    for o, a in zip(obtenu, attendu, strict=True):
         assert o == pytest.approx(a)
 
 
@@ -122,8 +135,14 @@ def test_feature_inconnue_leve_une_erreur_claire(monkeypatch):
 
 
 def test_registre_contient_les_six_features():
-    assert set(features._REGISTRE) >= {"req_count", "error_4xx", "error_5xx",
-                                       "error_logs", "latency_avg_ms", "latency_p95_ms"}
+    assert set(features._REGISTRE) >= {
+        "req_count",
+        "error_4xx",
+        "error_5xx",
+        "error_logs",
+        "latency_avg_ms",
+        "latency_p95_ms",
+    }
     assert features._REGISTRE["req_count"]["trou"] == 0
     assert features._REGISTRE["latency_avg_ms"]["trou"] == "precedent"
 

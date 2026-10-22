@@ -24,9 +24,36 @@ package = false
 dev = [
     "jupyterlab>=4.6.4",
     "matplotlib>=3.11.2",
+    "mypy>=2.4.0",
+    "pip-audit>=2.10.1",
     "poethepoet>=0.49.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+# S311 : le hasard sert à simuler des données, jamais à la cryptographie.
+ignore = ["S311"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]  # assert et faux jetons dans les tests
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "config.py", "outils"]
+ignore_missing_imports = true
+warn_unreachable = true
+show_error_codes = true
+
+[tool.coverage.run]
+source = ["app", "config"]
 
 [tool.poe.tasks.serve]
 help = "Lance le serveur (source lue dans .env), rechargement auto"
@@ -38,5 +65,33 @@ cmd = "uvicorn app.presentation.api.main:app --reload --port 8000"
 env = { DETECTOR_SOURCE = "simule" }
 
 [tool.poe.tasks.test]
-help = "Lance les tests"
+help = "Lance les tests avec couverture (seuil 80 %)"
 cmd = "pytest"
+
+[tool.poe.tasks.lint]
+help = "Vérifie le style et la sécurité du code (ruff)"
+cmd = "ruff check ."
+
+[tool.poe.tasks.format]
+help = "Formate le code (ruff format)"
+cmd = "ruff format ."
+
+[tool.poe.tasks."format:check"]
+help = "Vérifie le formatage sans rien modifier (ruff format --check)"
+cmd = "ruff format --check ."
+
+[tool.poe.tasks.typecheck]
+help = "Vérifie les types (mypy)"
+cmd = "mypy"
+
+[tool.poe.tasks.security]
+help = "Audit des dépendances : échoue dès une vulnérabilité connue (pip-audit)"
+cmd = "pip-audit --skip-editable"
+
+[tool.poe.tasks.quality]
+help = "Lint, formatage et types (bloquant en CI)"
+sequence = ["lint", "format:check", "typecheck"]
+
+[tool.poe.tasks.check]
+help = "Qualité, audit des dépendances puis tests (ce que la CI exécute)"
+sequence = ["quality", "security", "test"]

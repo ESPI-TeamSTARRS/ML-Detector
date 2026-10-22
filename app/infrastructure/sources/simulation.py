@@ -4,7 +4,8 @@ SIMULATION : fausse plateforme pour développer et tester.
 Génère des LOGS BRUTS réalistes + incidents injectables.
 Ajoute une colonne _verite (service réellement touché) pour l'évaluation.
 """
-from typing import Optional
+
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,8 +37,9 @@ class SimulationSource(Source):
         "latency_p95_ms": (200, 30),
     }
 
-    def __init__(self, incidents: Optional[list[dict]] = None, seed: int = 42, pas: int = 10,
-                 origine: Optional[float] = None):
+    def __init__(
+        self, incidents: list[dict] | None = None, seed: int = 42, pas: int = 10, origine: float | None = None
+    ):
         """
         origine : instant de référence (secondes). Les incidents (debut_s) sont comptés depuis ce point.
                  Par défaut : None (début de chaque fetch). Fixé à time.time() pour temps réel.
@@ -68,13 +70,11 @@ class SimulationSource(Source):
 
     def lire_logs(self, debut: float, fin: float) -> list[dict]:
         """Génère des logs bruts réalistes."""
-        import math
-        from datetime import datetime, timezone
 
         # Fenêtres alignées sur le pas, fin EXCLUE (même convention que construire_tableau).
-        grille = pd.Index(np.arange(int(debut // self.pas * self.pas),
-                                    int(np.ceil(fin / self.pas) * self.pas),
-                                    self.pas))
+        grille = pd.Index(
+            np.arange(int(debut // self.pas * self.pas), int(np.ceil(fin / self.pas) * self.pas), self.pas)
+        )
         if len(grille) == 0:
             return []
 
@@ -83,12 +83,10 @@ class SimulationSource(Source):
         # Variation sinusoïdale du trafic (monte et descend)
         vague = 1 + 0.3 * np.sin(2 * np.pi * (decalage / self.pas) / 120)
 
-        logs = []
+        logs: list[dict[str, Any]] = []
         for ts in grille:
             idx = int((ts - grille[0]) / self.pas)
             for service in config.SERVICES:
-                mesures = config.SERVICES[service].get("features", [])
-
                 # Nombre de requêtes pour cette fenêtre
                 nb_req = int(self.rng.poisson(20 * vague[idx]))
 
@@ -96,9 +94,9 @@ class SimulationSource(Source):
                 for _ in range(nb_req):
                     status_code = 200  # normal par défaut
                     if self.rng.random() < 0.02:  # 2% d'erreurs 4xx
-                        status_code = 400 + self.rng.integers(0, 100)
+                        status_code = 400 + int(self.rng.integers(0, 100))
                     elif self.rng.random() < 0.005:  # 0.5% d'erreurs 5xx
-                        status_code = 500 + self.rng.integers(0, 10)
+                        status_code = 500 + int(self.rng.integers(0, 10))
 
                     duration_ms = max(0, self.rng.normal(120, 15))
 
@@ -129,13 +127,15 @@ class SimulationSource(Source):
                     # Ajouter des requêtes
                     ts_fenetre = grille[indices[i]]
                     for _ in range(int(self.rng.poisson(150))):
-                        logs.append({
-                            "timestamp": self._instant(ts_fenetre),
-                            "service": service,
-                            "level": "ERROR" if self.rng.random() < 0.1 else "INFO",
-                            "status_code": 500 if self.rng.random() < 0.1 else 200,
-                            "duration_ms": max(0, self.rng.normal(500, 100)),
-                        })
+                        logs.append(
+                            {
+                                "timestamp": self._instant(ts_fenetre),
+                                "service": service,
+                                "level": "ERROR" if self.rng.random() < 0.1 else "INFO",
+                                "status_code": 500 if self.rng.random() < 0.1 else 200,
+                                "duration_ms": max(0, self.rng.normal(500, 100)),
+                            }
+                        )
                         logs[-1]["outcome"] = _resultat(logs[-1]["status_code"])
 
             elif type_inc == "panne":
@@ -143,28 +143,32 @@ class SimulationSource(Source):
                 for i, _ in enumerate(indices):
                     ts_fenetre = grille[indices[i]]
                     for _ in range(int(self.rng.poisson(20))):
-                        logs.append({
-                            "timestamp": self._instant(ts_fenetre),
-                            "service": service,
-                            "level": "ERROR",
-                            "status_code": 500,
-                            "duration_ms": max(0, self.rng.normal(300, 50)),
-                            "outcome": "error",
-                        })
+                        logs.append(
+                            {
+                                "timestamp": self._instant(ts_fenetre),
+                                "service": service,
+                                "level": "ERROR",
+                                "status_code": 500,
+                                "duration_ms": max(0, self.rng.normal(300, 50)),
+                                "outcome": "error",
+                            }
+                        )
 
             elif type_inc == "brute_force":
                 # Rafale d'erreurs 4xx
                 for i, _ in enumerate(indices):
                     ts_fenetre = grille[indices[i]]
                     for _ in range(int(self.rng.poisson(50))):
-                        logs.append({
-                            "timestamp": self._instant(ts_fenetre),
-                            "service": service,
-                            "level": "WARN",
-                            "status_code": 401 + self.rng.integers(0, 3),
-                            "duration_ms": max(0, self.rng.normal(50, 10)),
-                            "outcome": "denied",
-                        })
+                        logs.append(
+                            {
+                                "timestamp": self._instant(ts_fenetre),
+                                "service": service,
+                                "level": "WARN",
+                                "status_code": 401 + self.rng.integers(0, 3),
+                                "duration_ms": max(0, self.rng.normal(50, 10)),
+                                "outcome": "denied",
+                            }
+                        )
 
         # Garde uniquement [debut, fin) : la première fenêtre peut commencer avant `debut`.
-        return [l for l in logs if debut <= l["timestamp"] < fin]
+        return [log for log in logs if debut <= log["timestamp"] < fin]

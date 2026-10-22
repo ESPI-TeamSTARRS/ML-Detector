@@ -2,6 +2,7 @@
 REPLAY : rejoue un CSV photo par photo, comme en direct, et affiche les événements (JSON).
 Si le CSV contient la colonne _verite (données simulées), affiche aussi une évaluation.
 """
+
 import argparse
 import json
 import sys
@@ -21,10 +22,10 @@ EXEMPLES = """exemple (PowerShell, depuis le dossier ml-detector) :
 def charger_detecteur(chemin: str) -> AnomalyDetector:
     try:
         return AnomalyDetector.load(chemin)
-    except FileNotFoundError:
-        raise ErreurDonnees(f"Modèle introuvable : {chemin} (lancer d'abord le CLI train)")
+    except FileNotFoundError as err:
+        raise ErreurDonnees(f"Modèle introuvable : {chemin} (lancer d'abord le CLI train)") from err
     except Exception as e:  # fichier corrompu, mauvaise version...
-        raise ErreurDonnees(f"Modèle illisible ({chemin}) : {e}")
+        raise ErreurDonnees(f"Modèle illisible ({chemin}) : {e}") from e
 
 
 def evaluer(df: pd.DataFrame, evenements: list[dict]) -> None:
@@ -52,11 +53,17 @@ def evaluer(df: pd.DataFrame, evenements: list[dict]) -> None:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         description="Rejoue un CSV dans le détecteur, photo par photo.",
-        epilog=EXEMPLES, formatter_class=argparse.RawDescriptionHelpFormatter)
+        epilog=EXEMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--data", required=True, help="CSV de photos (produit par collect)")
     p.add_argument("--modele", default=config.MODEL_PATH, help="modèle .joblib (défaut : %(default)s)")
-    p.add_argument("--n", type=int, default=config.N_CONSECUTIFS,
-                   help="photos anormales d'affilée avant alerte (défaut : %(default)s)")
+    p.add_argument(
+        "--n",
+        type=int,
+        default=config.N_CONSECUTIFS,
+        help="photos anormales d'affilée avant alerte (défaut : %(default)s)",
+    )
     args = p.parse_args(argv)
 
     try:

@@ -11,13 +11,15 @@ Les logs entrent sous différents formats, on les normalise :
 
 Résultat : DataFrame [timestamp(s), service, level, status_code, duration_ms, outcome]
 """
+
 import math
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Any
 
 import pandas as pd
 
 import config
-
 
 COLONNES = ["timestamp", "service", "level", "status_code", "duration_ms", "outcome"]
 
@@ -35,11 +37,16 @@ NOMS_USUELS = {
 
 def _vide() -> pd.DataFrame:
     # DataFrame vide MAIS avec les bonnes colonnes : le reste du code n'a pas de cas spécial.
-    return pd.DataFrame({
-        "timestamp": pd.Series(dtype=float), "service": pd.Series(dtype=object),
-        "level": pd.Series(dtype=object), "status_code": pd.Series(dtype=float),
-        "duration_ms": pd.Series(dtype=float), "outcome": pd.Series(dtype=object),
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": pd.Series(dtype=float),
+            "service": pd.Series(dtype=object),
+            "level": pd.Series(dtype=object),
+            "status_code": pd.Series(dtype=float),
+            "duration_ms": pd.Series(dtype=float),
+            "outcome": pd.Series(dtype=object),
+        }
+    )
 
 
 def _normaliser_timestamp(valeur) -> float | None:
@@ -64,7 +71,7 @@ def _normaliser_timestamp(valeur) -> float | None:
             except ValueError:
                 return None
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt.timestamp()
 
     try:
@@ -102,7 +109,7 @@ def _lire_champ(log_brut: dict, nom: str, correspondance: dict):
     return False, None
 
 
-def normaliser(logs: list[dict]) -> pd.DataFrame:
+def normaliser(logs: Iterable[Any] | None) -> pd.DataFrame:
     """
     Normalise une liste de logs bruts en DataFrame [timestamp, service, level, status_code, duration_ms].
 
@@ -128,15 +135,17 @@ def normaliser(logs: list[dict]) -> pd.DataFrame:
         _, status = _lire_champ(log_brut, "status_code", correspondance)
         _, duree = _lire_champ(log_brut, "duration_ms", correspondance)
         _, resultat = _lire_champ(log_brut, "outcome", correspondance)
-        lignes.append({
-            "timestamp": ts,
-            "service": service,
-            "level": level.strip().upper() if isinstance(level, str) else "",
-            "status_code": status,
-            "duration_ms": duree,
-            # minuscules : "Denied" et "denied" doivent compter pareil ; "" = champ absent
-            "outcome": resultat.strip().lower() if isinstance(resultat, str) else "",
-        })
+        lignes.append(
+            {
+                "timestamp": ts,
+                "service": service,
+                "level": level.strip().upper() if isinstance(level, str) else "",
+                "status_code": status,
+                "duration_ms": duree,
+                # minuscules : "Denied" et "denied" doivent compter pareil ; "" = champ absent
+                "outcome": resultat.strip().lower() if isinstance(resultat, str) else "",
+            }
+        )
 
     if not lignes:
         return _vide()

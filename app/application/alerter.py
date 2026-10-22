@@ -3,6 +3,7 @@ ALERTER : envoie les événements au moteur de remédiation (HTTP POST + jeton).
 
 Avec retry automatique (3 essais) et backoff exponentiel.
 """
+
 import logging
 import time
 

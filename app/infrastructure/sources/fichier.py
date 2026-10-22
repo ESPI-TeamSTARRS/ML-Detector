@@ -8,9 +8,9 @@ Formats acceptés :
 
 Utilisé par la CLI collect.py.
 """
+
 import bisect
 import json
-from typing import Optional
 
 import pandas as pd
 
@@ -28,7 +28,7 @@ def _lire_lignes(chemin: str):
     with open(chemin, "rb") as f:
         debut = f.read(2)
     encodage = "utf-16" if debut in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
-    with open(chemin, "r", encoding=encodage, errors="replace") as f:
+    with open(chemin, encoding=encodage, errors="replace") as f:
         yield from f
 
 
@@ -38,7 +38,7 @@ class FichierSource(Source):
     def __init__(self, chemin_fichier: str):
         self.chemin = chemin_fichier
         # Chargé une fois : liste de (timestamp_s, log) TRIÉE par timestamp.
-        self._entrees: Optional[list] = None
+        self._entrees: list | None = None
         self._instants: list[float] = []
 
     def _charger_fichier(self) -> list:
@@ -49,8 +49,7 @@ class FichierSource(Source):
         if chemin.endswith(".csv"):
             df = pd.read_csv(self.chemin)
             # to_dict met NaN pour les cases vides : on retire ces clés (champ absent).
-            logs = [{k: v for k, v in ligne.items() if not pd.isna(v)}
-                    for ligne in df.to_dict("records")]
+            logs = [{k: v for k, v in ligne.items() if not pd.isna(v)} for ligne in df.to_dict("records")]
         elif chemin.endswith((".jsonl", ".ndjson")):
             logs = []
             for ligne in _lire_lignes(self.chemin):
@@ -59,16 +58,14 @@ class FichierSource(Source):
                 try:
                     log = json.loads(ligne)
                 except json.JSONDecodeError:
-                    continue            # ligne corrompue : on passe, on ne plante pas
+                    continue  # ligne corrompue : on passe, on ne plante pas
                 if isinstance(log, dict):
                     logs.append(log)
         elif chemin.endswith((".log", ".txt")):
             services = list(config.SERVICES)
-            logs = [log for log in (parser_ligne_docker(ligne, services)
-                                    for ligne in _lire_lignes(self.chemin)) if log]
+            logs = [log for log in (parser_ligne_docker(ligne, services) for ligne in _lire_lignes(self.chemin)) if log]
         else:
-            raise ValueError(f"Format non supporté : {self.chemin}. "
-                             "Accepte .csv, .jsonl, .ndjson, .log, .txt")
+            raise ValueError(f"Format non supporté : {self.chemin}. Accepte .csv, .jsonl, .ndjson, .log, .txt")
 
         # Timestamps convertis UNE seule fois ici (pas à chaque lecture de fenêtre).
         entrees = []

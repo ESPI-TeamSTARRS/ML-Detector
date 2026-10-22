@@ -8,12 +8,15 @@ mode de transmission des logs...) SANS toucher au reste du code.
 Les valeurs surchargeables par variable d'environnement le sont pour Docker :
 on change le comportement dans le docker-compose, pas dans le code.
 """
+
 import os
+from typing import Any
 
 # Développement : si un fichier .env existe, ses valeurs sont chargées. Les VRAIES variables
 # d'environnement (celles que Docker injecte en production) restent prioritaires (override=False).
 try:
     from dotenv import load_dotenv
+
     load_dotenv(override=False)
 except ImportError:  # python-dotenv absent : on lit simplement l'environnement
     pass
@@ -42,34 +45,36 @@ LOKI_LABEL_SERVICE = os.getenv("LOKI_LABEL_SERVICE", "service")
 LOKI_EXCLURE = [m.strip() for m in os.getenv("LOKI_EXCLURE", "").split(",") if m.strip()]
 # Sélecteur LogQL des flux à lire. Par défaut : tous ceux qui ont le label service.
 # Exemple si INFRA ajoute un label de projet : '{compose_project="resilience",service=~".+"}'
-LOKI_SELECTEUR = os.getenv("LOKI_SELECTEUR", "") or '{%s=~".+"}' % LOKI_LABEL_SERVICE
+LOKI_SELECTEUR = os.getenv("LOKI_SELECTEUR", "") or f'{{{LOKI_LABEL_SERVICE}=~".+"}}'
 
 # --- Format des logs (décision D8) -------------------------------------------
 # Si l'équipe utilise d'autres noms de champs, les relier ici.
 # Format : {"nom attendu par le ML": "nom réel dans les logs"}
 # Exemple : {"timestamp": "ts", "service": "app", "status_code": "http_code"}
-CORRESPONDANCE_CHAMPS = {}
+CORRESPONDANCE_CHAMPS: dict[str, str] = {}
 
 # --- Services surveillés -----------------------------------------------------
 # criticite : 1 (faible) à 4 (vital) — À ALIGNER avec l'analyse EBIOS de l'équipe GOUV.
 # features  : celles qui ont du sens pour ce service (voir app/domaine/features.py).
 # Les noms doivent être EXACTEMENT ceux des logs / du label Loki.
 # Un service absent d'ici n'est jamais surveillé (limite à citer dans le dossier).
-SERVICES = {
+SERVICES: dict[str, dict[str, Any]] = {
     # Noms EXACTS du champ "service" des logs JSON de l'équipe DEV (préfixe "basecamp-").
     # Ces logs n'ont pas de code HTTP : on compte les événements (req_count), les refus
     # (denied_count : outcome = "denied") et tout ce qui n'est pas un succès (non_success_count).
     # Criticités PROVISOIRES : à remplacer par celles de l'analyse EBIOS.
     "basecamp-payment": {"criticite": 4, "features": ["req_count", "denied_count", "non_success_count", "error_logs"]},
-    "basecamp-auth":    {"criticite": 3, "features": ["req_count", "denied_count", "non_success_count", "error_logs"]},
+    "basecamp-auth": {"criticite": 3, "features": ["req_count", "denied_count", "non_success_count", "error_logs"]},
     # Seul le shop envoie duration_ms (sur les devis acceptés) : les latences n'ont de sens que là.
-    "basecamp-shop":    {"criticite": 3, "features": ["req_count", "denied_count", "non_success_count", "error_logs",
-                                                    "latency_avg_ms"]},
+    "basecamp-shop": {
+        "criticite": 3,
+        "features": ["req_count", "denied_count", "non_success_count", "error_logs", "latency_avg_ms"],
+    },
 }
 
 # --- Modèle (décisions D2/D3) --------------------------------------------------
 # type : "isolation_forest" (principal), "lof" ou "statistique" (comparaison)
-MODELE = {
+MODELE: dict[str, Any] = {
     "type": "isolation_forest",
     # contamination 0.03 : mesuré sur 2 h de trafic (voir BENCHMARK.md). À 0.01, un flood n'est pas détecté ;
     # de 0.02 à 0.05, tous les incidents testés le sont en 20 s sans fausse alerte ; à 0.10, fausses alertes.
@@ -94,8 +99,8 @@ REMEDIATION_URL = os.getenv("REMEDIATION_URL", "")
 # --- Contexte envoyé au LLM / RAG (début d'incident uniquement) -------------------
 # URL du RAG. Vide = fonction désactivée. Jeton : RAG_TOKEN (ou RAG_TOKEN_FILE).
 RAG_URL = os.getenv("RAG_URL", "")
-RAG_FENETRE_S = int(os.getenv("RAG_FENETRE_S", "60"))   # logs des N dernières secondes
-RAG_MAX_LOGS = int(os.getenv("RAG_MAX_LOGS", "200"))    # plafond de logs par envoi
+RAG_FENETRE_S = int(os.getenv("RAG_FENETRE_S", "60"))  # logs des N dernières secondes
+RAG_MAX_LOGS = int(os.getenv("RAG_MAX_LOGS", "200"))  # plafond de logs par envoi
 RAG_TIMEOUT_S = float(os.getenv("RAG_TIMEOUT_S", "3"))  # délai max : le LLM ne doit pas ralentir le détecteur
 
 

@@ -6,12 +6,13 @@ DÉTECTEUR : le cœur de la détection d'anomalies.
   3. gravite() : criticité x intensité = niveau d'alerte
   4. IncidentTracker : filtre les alertes (3 photos anormales d'affilée)
 """
+
 from __future__ import annotations
 
 import json
 import warnings
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -45,20 +46,18 @@ class AnomalyDetector:
         # Sans argument : on prend le réglage de config.py (un seul endroit à modifier).
         # Les paramètres de config ne valent que pour le type de config : on ne donne pas
         # n_estimators à un LOF. Les kwargs explicites l'emportent toujours.
-        if type_modele is None:
-            type_modele = config.MODELE["type"]
-        params = dict(config.MODELE["params"]) if type_modele == config.MODELE["type"] else {}
+        self.type_modele: str = type_modele if type_modele is not None else config.MODELE["type"]
+        params = dict(config.MODELE["params"]) if self.type_modele == config.MODELE["type"] else {}
         params.update(kwargs)
-        self.type_modele = type_modele
         self.params_modele = params
         self.nb_photos_entrainement = 0
         self.modeles: dict[str, ModeleBase] = {}
         self.features_par_service: dict[str, list[str]] = {}
         self.features: list[str] = []
-        self.moyenne = None
-        self.ecart = None
+        self.moyenne: pd.Series | None = None
+        self.ecart: pd.Series | None = None
 
-    def fit(self, normal: pd.DataFrame) -> "AnomalyDetector":
+    def fit(self, normal: pd.DataFrame) -> AnomalyDetector:
         """Entraîner sur du trafic normal uniquement."""
         X = normal[colonnes_features(normal)]
         self.nb_photos_entrainement = len(X)
@@ -92,10 +91,10 @@ class AnomalyDetector:
         if manquantes:
             raise ValueError(f"Colonnes absentes : {sorted(manquantes)}")
 
-        scores = pd.DataFrame({
-            f"score_{s}": m.decision_function(df[self.features_par_service[s]])
-            for s, m in self.modeles.items()
-        }, index=df.index)
+        scores = pd.DataFrame(
+            {f"score_{s}": m.decision_function(df[self.features_par_service[s]]) for s, m in self.modeles.items()},
+            index=df.index,
+        )
 
         resultat = scores.copy()
         resultat["score"] = scores.min(axis=1)
@@ -106,6 +105,8 @@ class AnomalyDetector:
 
     def expliquer(self, lignes: pd.DataFrame, service: str) -> dict:
         """Quelles colonnes du service s'écartent le plus ?"""
+        if self.moyenne is None or self.ecart is None:
+            raise RuntimeError("Détecteur non entraîné")
         moyenne_lignes = lignes[self.features].mean()
         z = (moyenne_lignes - self.moyenne) / self.ecart
         z_service = z[self.features_par_service[service]]
@@ -121,8 +122,10 @@ class AnomalyDetector:
         Fiche de traçabilité (pour le jury) : avec quoi ce modèle a été entraîné.
         Ne contient AUCUN secret : uniquement des réglages et des statistiques.
         """
+        if self.moyenne is None or self.ecart is None:
+            raise RuntimeError("Détecteur non entraîné")
         return {
-            "date_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "date_utc": datetime.now(UTC).isoformat(timespec="seconds"),
             "type_modele": self.type_modele,
             "params_modele": self.params_modele,
             "features_par_service": self.features_par_service,
@@ -136,15 +139,19 @@ class AnomalyDetector:
         """Sauvegarde le détecteur (.joblib) et, à côté, sa fiche lisible (.json)."""
         joblib.dump({"detecteur": self, "sklearn": sklearn.__version__}, chemin)
         Path(chemin).with_suffix(".json").write_text(
-            json.dumps(self.fiche(), indent=2, ensure_ascii=False), encoding="utf-8")
+            json.dumps(self.fiche(), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
     @staticmethod
-    def load(chemin: str) -> "AnomalyDetector":
+    def load(chemin: str) -> AnomalyDetector:
         """Charge le détecteur et vérifie la version sklearn."""
         contenu = joblib.load(chemin)
         if contenu["sklearn"] != sklearn.__version__:
-            warnings.warn(f"Modèle entraîné avec sklearn {contenu['sklearn']}, "
-                          f"chargé avec {sklearn.__version__} : aligner les versions !")
+            warnings.warn(
+                f"Modèle entraîné avec sklearn {contenu['sklearn']}, "
+                f"chargé avec {sklearn.__version__} : aligner les versions !",
+                stacklevel=2,
+            )
         return contenu["detecteur"]
 
 
@@ -174,9 +181,9 @@ class IncidentTracker:
         self.n = n_consecutifs
         self.en_incident = False
         self.compteur = 0
-        self.tampon = deque(maxlen=n_consecutifs)
-        self.debut = None
-        self.service = None
+        self.tampon: deque[tuple[pd.DataFrame, str]] = deque(maxlen=n_consecutifs)
+        self.debut: int | None = None
+        self.service: str | None = None
         self.dernier_resultat = None
 
     def mettre_a_jour(self, ligne: pd.DataFrame) -> dict | None:
@@ -200,7 +207,7 @@ class IncidentTracker:
             # Service touché = celui désigné le plus souvent sur les N dernières photos
             suspects = pd.Series([svc for _, svc in self.tampon if svc])
             service = suspects.mode().iloc[0]
-            explication = self.det.expliquer(pd.concat([l for l, _ in self.tampon]), service)
+            explication = self.det.expliquer(pd.concat([ligne for ligne, _ in self.tampon]), service)
             self.debut, self.service = ts, explication["service"]
             return {
                 "evenement": "incident_debut",
@@ -213,5 +220,5 @@ class IncidentTracker:
             "evenement": "incident_fin",
             "timestamp": ts,
             "service": self.service,
-            "duree_s": ts - self.debut,
+            "duree_s": ts - self.debut if self.debut is not None else 0,
         }

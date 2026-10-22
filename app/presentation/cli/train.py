@@ -1,6 +1,7 @@
 """
 TRAIN : entraîne le détecteur sur du trafic NORMAL uniquement (apprentissage non supervisé).
 """
+
 import argparse
 import sys
 
@@ -16,19 +17,28 @@ EXEMPLES = """exemples (PowerShell, depuis le dossier ml-detector) :
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         description="Entraîne le détecteur sur un CSV de trafic normal (produit par collect).",
-        epilog=EXEMPLES, formatter_class=argparse.RawDescriptionHelpFormatter)
+        epilog=EXEMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--data", required=True, help="CSV de trafic normal")
     p.add_argument("--out", default=config.MODEL_PATH, help="modèle .joblib (défaut : %(default)s)")
-    p.add_argument("--modele", choices=["isolation_forest", "lof", "statistique"],
-                   default=config.MODELE["type"], help="algorithme (défaut : %(default)s)")
-    p.add_argument("--contamination", type=float, default=config.MODELE["params"].get("contamination"),
-                   help="part de photos normales tolérées comme 'bizarres' (défaut : %(default)s ; "
-                        "sans effet sur le modèle statistique)")
+    p.add_argument(
+        "--modele",
+        choices=["isolation_forest", "lof", "statistique"],
+        default=config.MODELE["type"],
+        help="algorithme (défaut : %(default)s)",
+    )
+    p.add_argument(
+        "--contamination",
+        type=float,
+        default=config.MODELE["params"].get("contamination"),
+        help="part de photos normales tolérées comme 'bizarres' (défaut : %(default)s ; "
+        "sans effet sur le modèle statistique)",
+    )
     args = p.parse_args(argv)
 
     try:
-        entrainer_et_sauvegarder(args.data, args.out, type_modele=args.modele,
-                                 contamination=args.contamination)
+        entrainer_et_sauvegarder(args.data, args.out, type_modele=args.modele, contamination=args.contamination)
     except ErreurDonnees as e:
         print(f"Erreur : {e}", file=sys.stderr)
         return 1

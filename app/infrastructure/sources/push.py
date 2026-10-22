@@ -4,8 +4,10 @@ PUSH : reçoit les logs via POST /ingest (route dans presentation/api/routes/ing
 Tampon mémoire thread-safe : la route (thread FastAPI) écrit, la boucle de détection
 (autre thread) lit.
 """
+
 import threading
 from collections import deque
+from collections.abc import Iterable
 
 from app.infrastructure.sources.base import Source, extraire_timestamp
 
@@ -23,10 +25,10 @@ class PushSource(Source):
     def __init__(self, retention_s: int = 600, max_logs: int = 200_000):
         self.retention_s = retention_s
         # deque(maxlen=...) jette tout seul l'élément le plus ancien quand elle est pleine.
-        self.tampon: deque = deque(maxlen=max_logs)   # éléments : (timestamp_s, log)
+        self.tampon: deque = deque(maxlen=max_logs)  # éléments : (timestamp_s, log)
         self.verrou = threading.Lock()
 
-    def ajouter(self, logs: list[dict]) -> None:
+    def ajouter(self, logs: Iterable[object]) -> None:
         """Ajoute des logs (appelé par /ingest). Les logs sans timestamp exploitable sont ignorés."""
         # On calcule le timestamp UNE fois ici, hors verrou, plutôt qu'à chaque lecture.
         a_garder = []
@@ -45,6 +47,5 @@ class PushSource(Source):
         with self.verrou:
             # On ne supprime QUE les trop vieux : les logs futurs (ts >= fin) restent pour
             # la prochaine lecture (le détecteur lit avec du retard, les logs arrivent en avance).
-            self.tampon = deque((e for e in self.tampon if e[0] >= limite),
-                                maxlen=self.tampon.maxlen)
+            self.tampon = deque((e for e in self.tampon if e[0] >= limite), maxlen=self.tampon.maxlen)
             return [log for ts, log in self.tampon if debut <= ts < fin]

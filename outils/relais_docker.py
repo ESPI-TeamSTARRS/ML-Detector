@@ -18,6 +18,7 @@ processus) : fichier (--jeton-file) ou variable INGEST_TOKEN. Il n'est jamais af
 
 Bibliothèque standard + requests uniquement. Aucun code exécuté à l'import.
 """
+
 import argparse
 import json
 import os
@@ -27,22 +28,23 @@ import sys
 import threading
 import time
 from collections import deque
-from datetime import datetime, timezone
-from typing import Callable, Iterable, Optional
+from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 
 # Permet `python outils/relais_docker.py` depuis la racine du projet (config.py, app/...).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.infrastructure.sources.docker_logs import parser_ligne_docker  # noqa: E402
 
-TAILLE_LOT = 500          # logs par envoi
-INTERVALLE_S = 2.0        # un lot partiel part au plus tard après 2 s
-TAMPON_MAX = 50_000       # logs gardés si le détecteur est indisponible (les plus anciens sortent)
+TAILLE_LOT = 500  # logs par envoi
+INTERVALLE_S = 2.0  # un lot partiel part au plus tard après 2 s
+TAMPON_MAX = 50_000  # logs gardés si le détecteur est indisponible (les plus anciens sortent)
 BACKOFF_MAX_S = 30.0
 
 
-def construire_commande(compose_file: Optional[str] = None, projet: Optional[str] = None,
-                        depuis: Optional[str] = None) -> list[str]:
+def construire_commande(
+    compose_file: str | None = None, projet: str | None = None, depuis: str | None = None
+) -> list[str]:
     """
     Commande `docker compose logs`, sous forme de liste (pas de shell : marche pareil sous
     Windows et évite toute injection). --since évite de rejouer tout l'historique.
@@ -53,7 +55,7 @@ def construire_commande(compose_file: Optional[str] = None, projet: Optional[str
     if projet:
         cmd += ["-p", projet]
     if depuis is None:
-        depuis = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        depuis = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     cmd += ["logs", "-f", "--no-color", "--timestamps", "--since", depuis]
     return cmd
 
@@ -61,7 +63,7 @@ def construire_commande(compose_file: Optional[str] = None, projet: Optional[str
 def decouper_en_lots(logs: Iterable[dict], taille: int = TAILLE_LOT) -> list[list[dict]]:
     """Découpe en lots de `taille` logs au plus (le dernier peut être plus petit)."""
     logs = list(logs)
-    return [logs[i:i + taille] for i in range(0, len(logs), taille)]
+    return [logs[i : i + taille] for i in range(0, len(logs), taille)]
 
 
 def delai_backoff(essais: int, maximum: float = BACKOFF_MAX_S) -> float:
@@ -81,8 +83,13 @@ class Emetteur:
       plutôt que de saturer la mémoire.
     """
 
-    def __init__(self, envoi: Callable[[list], bool], taille_lot: int = TAILLE_LOT,
-                 intervalle_s: float = INTERVALLE_S, tampon_max: int = TAMPON_MAX):
+    def __init__(
+        self,
+        envoi: Callable[[list], bool],
+        taille_lot: int = TAILLE_LOT,
+        intervalle_s: float = INTERVALLE_S,
+        tampon_max: int = TAMPON_MAX,
+    ):
         self.envoi = envoi
         self.taille_lot = taille_lot
         self.intervalle_s = intervalle_s
@@ -126,7 +133,7 @@ class Emetteur:
                 break
 
 
-def lire_jeton(fichier: Optional[str]) -> str:
+def lire_jeton(fichier: str | None) -> str:
     """Jeton depuis un fichier, sinon depuis la variable INGEST_TOKEN. Jamais depuis la ligne de commande."""
     if fichier:
         with open(fichier, encoding="utf-8") as f:
@@ -137,6 +144,7 @@ def lire_jeton(fichier: Optional[str]) -> str:
 def creer_envoi_http(url: str, jeton: str, timeout: float = 10.0) -> Callable[[list], bool]:
     """Fonction d'envoi POST {"logs": [...]} avec Authorization: Bearer. N'affiche jamais le jeton."""
     import requests
+
     session = requests.Session()
     entetes = {"Authorization": f"Bearer {jeton}"}
 
@@ -159,6 +167,7 @@ def creer_envoi_http(url: str, jeton: str, timeout: float = 10.0) -> Callable[[l
 
 def creer_envoi_fichier(chemin: str) -> Callable[[list], bool]:
     """Fonction d'envoi qui AJOUTE les logs au fichier JSONL (jeu d'entraînement hors ligne)."""
+
     def envoi(lot: list) -> bool:
         with open(chemin, "a", encoding="utf-8", newline="\n") as f:
             for log in lot:
@@ -170,8 +179,11 @@ def creer_envoi_fichier(chemin: str) -> Callable[[list], bool]:
 
 def _lecteur(proc: subprocess.Popen, file: "queue.Queue") -> None:
     """Thread : pousse chaque ligne de stdout dans la file (None = fin du flux)."""
+    flux = proc.stdout
+    if flux is None:
+        return
     try:
-        for ligne in proc.stdout:
+        for ligne in flux:
             try:
                 file.put_nowait(ligne)
             except queue.Full:
@@ -190,8 +202,14 @@ def executer(args, services: list[str], envoi: Callable[[list], bool]) -> None:
             cmd = construire_commande(args.compose_file, args.projet, depuis)
             print("[relais] lancement : " + " ".join(cmd), file=sys.stderr)
             try:
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                        text=True, encoding="utf-8", errors="replace")
+                proc = subprocess.Popen(  # noqa: S603 : liste d'arguments fixes (docker compose logs), jamais de shell
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
             except OSError as e:
                 print(f"[relais] impossible de lancer docker : {e}", file=sys.stderr)
                 proc = None
@@ -213,7 +231,7 @@ def executer(args, services: list[str], envoi: Callable[[list], bool]) -> None:
                     emetteur.tick(time.monotonic())
                 proc.wait()
             # docker compose logs s'est arrêté (conteneurs recréés, daemon relancé...) : on repart.
-            depuis = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            depuis = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             print("[relais] flux interrompu, relance dans 3 s", file=sys.stderr)
             fin_attente = time.monotonic() + 3
             while time.monotonic() < fin_attente:
@@ -227,7 +245,7 @@ def executer(args, services: list[str], envoi: Callable[[list], bool]) -> None:
         emetteur.vider(time.monotonic())
 
 
-def lire_arguments(argv: Optional[list] = None) -> argparse.Namespace:
+def lire_arguments(argv: list | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Relaie `docker compose logs` vers le détecteur (à lancer sur l'hôte).")
     p.add_argument("--compose-file", help="fichier docker-compose.yml (sinon celui du dossier courant)")
     p.add_argument("--projet", help="nom du projet Compose (-p)")
@@ -241,12 +259,13 @@ def lire_arguments(argv: Optional[list] = None) -> argparse.Namespace:
     return args
 
 
-def main(argv: Optional[list] = None) -> int:
+def main(argv: list | None = None) -> int:
     args = lire_arguments(argv)
     if args.services:
         services = args.services
     else:
         import config
+
         services = list(config.SERVICES)
 
     if args.vers_fichier:

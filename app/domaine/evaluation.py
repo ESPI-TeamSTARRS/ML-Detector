@@ -7,11 +7,13 @@ Métriques :
   - Bon service : % de fois où le service correct est désigné
   - Fausses alertes : % de photos normales jugées anormales
 """
+
 import pandas as pd
+
 from app.domaine.detecteur import AnomalyDetector, IncidentTracker
 
 
-def etiqueter(df: pd.DataFrame, incidents: list[dict] = None) -> pd.DataFrame:
+def etiqueter(df: pd.DataFrame, incidents: list[dict] | None = None) -> pd.DataFrame:
     """
     Ajoute une colonne _verite (le service réellement touché, ou '').
 
