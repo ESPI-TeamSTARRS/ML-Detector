@@ -39,7 +39,7 @@ class LokiSource(Source):
     def _requete_page(self, debut_ns: int, fin_ns: int) -> list:
         """Une requête HTTP vers Loki. Renvoie la liste 'result' (flux). Lève RuntimeError si échec."""
         url = f"{self.loki_url}/loki/api/v1/query_range"
-        params = {
+        params: dict[str, str | int] = {
             # Le filtre de bruit est appliqué par Loki lui-même (moins de données transférées) :
             # {sélecteur} != "motif1" != "motif2"
             "query": self.selecteur + "".join(f' != "{m}"' for m in self.exclure),
