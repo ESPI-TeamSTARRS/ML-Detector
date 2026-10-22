@@ -1,0 +1,50 @@
+{
+  "date_utc": "2026-10-22T09:32:26+00:00",
+  "type_modele": "isolation_forest",
+  "params_modele": {
+    "contamination": 0.01,
+    "n_estimators": 200,
+    "random_state": 42
+  },
+  "features_par_service": {
+    "basecamp-auth": [
+      "basecamp-auth__req_count",
+      "basecamp-auth__denied_count",
+      "basecamp-auth__non_success_count"
+    ],
+    "basecamp-payment": [
+      "basecamp-payment__req_count",
+      "basecamp-payment__denied_count",
+      "basecamp-payment__non_success_count"
+    ],
+    "basecamp-shop": [
+      "basecamp-shop__req_count",
+      "basecamp-shop__denied_count",
+      "basecamp-shop__non_success_count"
+    ]
+  },
+  "nb_photos_entrainement": 726,
+  "version_sklearn": "1.6.1",
+  "moyenne": {
+    "basecamp-auth__req_count": 2.703856749311295,
+    "basecamp-auth__denied_count": 0.1115702479338843,
+    "basecamp-auth__non_success_count": 0.1115702479338843,
+    "basecamp-payment__req_count": 0.41046831955922863,
+    "basecamp-payment__denied_count": 0.006887052341597796,
+    "basecamp-payment__non_success_count": 0.006887052341597796,
+    "basecamp-shop__req_count": 13.717630853994491,
+    "basecamp-shop__denied_count": 0.5895316804407713,
+    "basecamp-shop__non_success_count": 0.5895316804407713
+  },
+  "ecart_type": {
+    "basecamp-auth__req_count": 3.2566810270373012,
+    "basecamp-auth__denied_count": 1.0,
+    "basecamp-auth__non_success_count": 1.0,
+    "basecamp-payment__req_count": 1.5772872568809726,
+    "basecamp-payment__denied_count": 1.0,
+    "basecamp-payment__non_success_count": 1.0,
+    "basecamp-shop__req_count": 8.183508591195096,
+    "basecamp-shop__denied_count": 1.0,
+    "basecamp-shop__non_success_count": 1.0
+  }
+}
