@@ -27,6 +27,7 @@ dev = [
     "mypy>=2.4.0",
     "pip-audit>=2.10.1",
     "poethepoet>=0.49.0",
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.1",
@@ -47,13 +48,13 @@ ignore = ["S311"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "config.py", "outils"]
+files = ["app", "config.py", "outils", "scripts"]
 ignore_missing_imports = true
 warn_unreachable = true
 show_error_codes = true
 
 [tool.coverage.run]
-source = ["app", "config"]
+source = ["app", "config", "scripts"]
 
 [tool.poe.tasks.serve]
 help = "Lance le serveur (source lue dans .env), rechargement auto"
@@ -99,3 +100,15 @@ sequence = ["quality", "security", "test"]
 [tool.poe.tasks.requirements]
 help = "Régénère requirements.txt (utilisé par le Dockerfile) depuis uv.lock : versions exactes, sans les outils de dev"
 cmd = "uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements.txt"
+
+[tool.poe.tasks."pre-commit"]
+help = "Hook pre-commit : lint et formatage"
+sequence = ["lint", "format:check"]
+
+[tool.poe.tasks."test:rapide"]
+help = "Tests sans couverture (hook pre-push, environ 1 minute)"
+cmd = "pytest --no-cov"
+
+[tool.poe.tasks."pre-push"]
+help = "Hook pre-push : types et tests"
+sequence = ["typecheck", "test:rapide"]

@@ -1,0 +1,4 @@
+title = "ML-Detector gitleaks"
+
+[extend]
+useDefault = true

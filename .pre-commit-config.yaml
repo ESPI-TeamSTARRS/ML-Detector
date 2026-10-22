@@ -1,0 +1,52 @@
+# Hooks git en 3 étages. Ils VÉRIFIENT, ne corrigent jamais (pas de --fix).
+# Prérequis : le binaire gitleaks v8.30.1 sur le PATH (winget install gitleaks.gitleaks).
+# Installation (une fois) : uv run pre-commit install --install-hooks
+#   commit-msg : format Conventional Commit
+#   pre-commit : secrets (index) + lint et formatage (rapide)
+#   pre-push   : secrets (plage poussée, comme la CI) + types + tests (environ 1 minute)
+# Même découpage que BaseCamp ; la CI rejoue les mêmes tâches poe (voir .github/workflows quand elle existe).
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      # gitleaks tourne depuis le binaire installé (v8.30.1, le même que la CI) : le hook distant du dépôt gitleaks
+      # compile le programme avec Go à l'installation, ce qui bloque ou dure très longtemps sous Windows.
+      - id: gitleaks
+        name: "gitleaks - index"
+        language: system
+        pass_filenames: false
+        entry: gitleaks git --pre-commit --redact --staged --verbose
+
+      - id: commit-msg-conventional
+        name: "commit-msg - Conventional Commit"
+        language: system
+        stages: [commit-msg]
+        entry: uv run python scripts/hooks/check_commit_msg.py
+        always_run: true
+
+      - id: qualite-pre-commit
+        name: "lint + formatage"
+        language: system
+        files: ^(app/|tests/|outils/|scripts/|config\.py$|pyproject\.toml$|\.pre-commit-config\.yaml$)
+        pass_filenames: false
+        entry: uv run poe pre-commit
+
+      # Même périmètre que le job `secrets-scan` de la CI : les commits que le push ajoute à main.
+      # Binaire `gitleaks` requis sur le PATH (même version que la CI : v8.30.1).
+      - id: gitleaks-push
+        name: "gitleaks - commits poussés"
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+        entry: uv run python scripts/hooks/gitleaks_push.py
+
+      - id: qualite-pre-push
+        name: "types + tests"
+        language: system
+        files: ^(app/|tests/|outils/|scripts/|config\.py$|pyproject\.toml$|uv\.lock$|requirements\.txt$)
+        pass_filenames: false
+        stages: [pre-push]
+        entry: uv run poe pre-push

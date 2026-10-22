@@ -61,6 +61,23 @@ uv run jupyter lab     # notebooks d'analyse (notebooks/)
 une dépendance : `uv add <paquet>==<version>`, puis `uv run poe requirements`. Les versions de scikit-learn, numpy, pandas et
 joblib restent figées : elles conditionnent le chargement du modèle entraîné.
 
+### Hooks Git
+
+Trois hooks vérifient, sans jamais corriger les fichiers ni se contourner (`--no-verify` interdit). Installation, une fois :
+
+```powershell
+uv run pre-commit install --install-hooks
+```
+
+| Hook | Contrôles |
+|---|---|
+| `commit-msg` | message au format Conventional Commit : `<type>(<portée>)?: <description>` (types : feat, fix, docs, chore, refactor, test, ci, build, perf, style, revert) |
+| `pre-commit` | gitleaks sur l'index, puis lint et formatage |
+| `pre-push` | gitleaks sur les commits poussés (même plage que la CI), puis types et tests sans couverture (environ 1 minute) |
+
+Les hooks `pre-commit` et `pre-push` demandent le binaire `gitleaks` sur le PATH, en version 8.30.1 (la même que la CI) :
+`winget install gitleaks.gitleaks` (ou voir [gitleaks](https://github.com/gitleaks/gitleaks#installing)).
+
 ## Utilisation
 
 ```powershell
